@@ -35,8 +35,8 @@ def normalizar(texto):
     if not texto or not texto.strip():
         raise ErrorFuncion("Escriba una función, por ejemplo: x^4 - 5x^3 + 0.5x^2 - 11x + 10")
     t = texto.strip().lower()
-    # Se permite escribir "f(x) = ..." o "y = ..."
-    t = re.sub(r"^\s*(f\s*\(\s*x\s*\)|y)\s*=", "", t)
+    # Se permite escribir "f(x) = ...", "f'(x) = ...", "y = ..." o "y' = ..."
+    t = re.sub(r"^\s*(f\s*[′']?\s*\(\s*x\s*\)|y\s*[′']?)\s*=", "", t)
     for viejo, nuevo in (("−", "-"), ("–", "-"), ("—", "-"), ("×", "*"), ("·", "*"), ("∙", "*"),
                          ("÷", "/"), ("**", "^"), ("√", "sqrt"), ("π", "pi"),
                          ("[", "("), ("]", ")"), ("{", "("), ("}", ")")):
@@ -334,19 +334,25 @@ def _mt(nodo):
         return _MATHTEXT_FUNC[nodo[1]] + r"\left(" + interno + r"\right)", 5
     if tipo == "neg":
         texto, prio = _mt(nodo[1])
-        return "-" + (texto if prio >= 3 else r"\left(" + texto + r"\right)"), 3
+        return "-" + (texto if prio >= 2 else r"\left(" + texto + r"\right)"), 3
 
     op = nodo[1]
     (ti, pi_), (td, pd) = _mt(nodo[2]), _mt(nodo[3])
     envolver = lambda t: r"\left(" + t + r"\right)"
+    if op == "^" and nodo[2][0] == "func" and nodo[2][1] in _MATHTEXT_FUNC and nodo[3][0] == "num":
+        # sen²(x), sec²(x): el exponente se escribe junto al nombre de la funcion
+        return _MATHTEXT_FUNC[nodo[2][1]] + "^{" + td + r"}\left(" + _mt(nodo[2][2])[0] + r"\right)", 4
     if op == "^":
-        base = ti if pi_ >= 5 and nodo[2][0] != "func" else envolver(ti)
+        es_fraccion = nodo[2][0] == "bin" and nodo[2][1] == "/"   # (x/3)² necesita parentesis
+        base = ti if pi_ >= 5 and nodo[2][0] != "func" and not es_fraccion else envolver(ti)
         return base + "^{" + td + "}", 4
     if op == "/":
         return r"\frac{" + ti + "}{" + td + "}", 5
     if op == "*":
         izq = ti if pi_ >= 2 else envolver(ti)
         der = td if pd >= 3 and nodo[3][0] != "neg" else envolver(td)
+        if nodo[2][0] == "num" and nodo[3][0] == "bin" and nodo[3][1] == "*":
+            der = td  # 2x·sen(x) en lugar de 2(x·sen(x))
         # Multiplicacion implicita: se respeta "5x^3" tal cual se escribio
         return izq + (r"\,\cdot\," if not nodo[4] or nodo[3][0] == "num" else "") + der, 2
     der = td if (pd > 1 and nodo[3][0] != "neg") else envolver(td)
@@ -468,10 +474,354 @@ def latex_a_texto(latex):
     return texto.replace("(,)", ",")
 
 
+# ----------------------------------------------------------------------
+# Derivada simbolica (la usa Newton-Raphson): se aplican las reglas de
+# derivacion sobre el arbol (suma, producto, cociente, potencia y regla de la
+# cadena) y el resultado se simplifica para que se vea como en el cuaderno:
+#   d/dx (x³ − x − 2) = 3x² − 1        d/dx (e^(−x) − x) = −e^(−x) − 1
+# Tampoco usa librerias: solo construye otro arbol con las mismas tuplas.
+# ----------------------------------------------------------------------
+def _tiene_x(nodo):
+    tipo = nodo[0]
+    if tipo == "x":
+        return True
+    if tipo in ("num", "const"):
+        return False
+    if tipo in ("neg", "abs"):
+        return _tiene_x(nodo[1])
+    if tipo == "func":
+        return _tiene_x(nodo[2])
+    return _tiene_x(nodo[2]) or _tiene_x(nodo[3])
+
+
+def _formato(valor):
+    """Numero sin notacion cientifica ni ceros de mas: 3.0 -> '3', 0.25 -> '0.25'."""
+    if valor == int(valor) and abs(valor) < 1e15:
+        return str(int(valor))
+    return f"{valor:.10f}".rstrip("0").rstrip(".")
+
+
+def _num(valor):
+    valor = round(valor, 12) + 0.0  # quita el ruido de punto flotante y el cero negativo
+    if valor < 0:
+        return ("neg", _num(-valor))
+    return ("num", valor, _formato(valor))
+
+
+def _valor(nodo):
+    """Valor de un nodo que es solo un numero (o un numero negativo); None si tiene algo mas."""
+    if nodo[0] == "num":
+        return nodo[1]
+    if nodo[0] == "neg" and nodo[1][0] == "num":
+        return -nodo[1][1]
+    return None
+
+
+def _neg(a):
+    va = _valor(a)
+    if va is not None:
+        return _num(-va)
+    if a[0] == "neg":
+        return a[1]
+    return ("neg", a)
+
+
+def _suma(a, b):
+    va, vb = _valor(a), _valor(b)
+    if va is not None and vb is not None:
+        return _num(va + vb)
+    if va == 0:
+        return b
+    if vb == 0:
+        return a
+    if b[0] == "neg":
+        return _resta(a, b[1])
+    if a[0] == "neg":
+        return _resta(b, a[1])
+    return ("bin", "+", a, b, False)
+
+
+def _resta(a, b):
+    va, vb = _valor(a), _valor(b)
+    if va is not None and vb is not None:
+        return _num(va - vb)
+    if vb == 0:
+        return a
+    if va == 0:
+        return _neg(b)
+    if b[0] == "neg":
+        return _suma(a, b[1])
+    if a == b:
+        return _num(0)
+    return ("bin", "-", a, b, False)
+
+
+def _producto(a, b):
+    va, vb = _valor(a), _valor(b)
+    if va is not None and vb is not None:
+        return _num(va * vb)
+    if va == 0 or vb == 0:
+        return _num(0)
+    if vb is not None:  # el numero va adelante: 3x en lugar de x·3
+        a, b, va, vb = b, a, vb, va
+    if va == 1:
+        return b
+    if va == -1:
+        return _neg(b)
+    if a[0] == "neg":
+        return _neg(_producto(a[1], b))
+    if b[0] == "neg":
+        return _neg(_producto(a, b[1]))
+    if va is not None and b[0] == "bin" and b[1] in ("*", "/") and _valor(b[2]) is not None:
+        # 5·(3x²) = 15x²     2·(3/x) = 6/x
+        junta = _num(va * _valor(b[2]))
+        return _producto(junta, b[3]) if b[1] == "*" else _cociente(junta, b[3])
+    if b[0] == "bin" and b[1] == "/" and _valor(b[2]) == 1:
+        return _cociente(a, b[3])
+    if a[0] == "bin" and a[1] == "/" and _valor(a[2]) == 1:
+        return _cociente(b, a[3])
+    if va is None:
+        # El numero va adelante: x·(2x) = 2(x·x) = 2x²     (3x)·sen(x) = 3(x·sen(x))
+        if b[0] == "bin" and b[1] == "*" and _valor(b[2]) is not None:
+            return _producto(b[2], _producto(a, b[3]))
+        if a[0] == "bin" and a[1] == "*" and _valor(a[2]) is not None:
+            return _producto(a[2], _producto(a[3], b))
+        # Misma base: x·x² = x³
+        (base_a, exp_a), (base_b, exp_b) = _base_exponente(a), _base_exponente(b)
+        if base_a == base_b and exp_a is not None and exp_b is not None:
+            return _elevar(base_a, _num(exp_a + exp_b))
+    return ("bin", "*", a, b, va is not None)
+
+
+def _base_exponente(nodo):
+    """x³ -> (x, 3);  x -> (x, 1);  x^(algo con x) -> (x^(...), None)."""
+    if nodo[0] == "bin" and nodo[1] == "^":
+        exponente = _valor(nodo[3])
+        return (nodo[2], exponente) if exponente is not None else (nodo, None)
+    return nodo, 1.0
+
+
+def _coeficiente(nodo):
+    """Separa el numero que multiplica: 2√(x) -> (2, √(x));  x -> (1, x)."""
+    if nodo[0] == "bin" and nodo[1] == "*" and _valor(nodo[2]) is not None:
+        return _valor(nodo[2]), nodo[3]
+    return 1.0, nodo
+
+
+def _decimal_exacto(q):
+    return abs(q * 1e6 - round(q * 1e6)) < 1e-6
+
+
+def _cociente(a, b):
+    va, vb = _valor(a), _valor(b)
+    if va == 0:
+        return _num(0)
+    if vb == 1:
+        return a
+    if vb == -1:
+        return _neg(a)
+    if a == b:
+        return _num(1)
+    if va is not None and vb not in (None, 0):
+        q = va / vb
+        if abs(q * 1e6 - round(q * 1e6)) < 1e-6:  # solo si da un decimal exacto (1/4 = 0.25, no 1/3)
+            return _num(q)
+    if a[0] == "neg":
+        return _neg(_cociente(a[1], b))
+    if b[0] == "neg":
+        return _neg(_cociente(a, b[1]))
+    # (p/q)/b = p/(q·b): 1/(x + 2)/(2√u) -> 1/((x + 2)·2√u)
+    if a[0] == "bin" and a[1] == "/":
+        return _cociente(a[2], _producto(a[3], b))
+    # Factor numerico comun: 2x/(2√u) = x/√u      6x/(3y) = 2x/y
+    (ka, resto_a), (kb, resto_b) = _coeficiente(a), _coeficiente(b)
+    if vb is None and kb not in (0, 1) and _decimal_exacto(ka / kb):
+        return _producto(_num(ka / kb), _cociente(resto_a, resto_b))
+    # Misma base: 6x/x⁴ = 6/x³     x³/x = x²
+    (base_a, exp_a), (base_b, exp_b) = _base_exponente(resto_a), _base_exponente(b)
+    if _valor(resto_a) is None and vb is None and base_a == base_b and exp_a is not None and exp_b is not None:
+        diferencia = exp_a - exp_b
+        if diferencia >= 0:
+            return _producto(_num(ka), _elevar(base_a, _num(diferencia)))
+        return _cociente(_num(ka), _elevar(base_a, _num(-diferencia)))
+    return ("bin", "/", a, b, False)
+
+
+def _elevar(a, b):
+    va, vb = _valor(a), _valor(b)
+    if vb == 0:
+        return _num(1)
+    if vb == 1:
+        return a
+    if va == 1:
+        return _num(1)
+    if va is not None and vb is not None and vb == int(vb) and abs(vb) <= 20 and not (va == 0 and vb < 0):
+        r = va ** int(vb)
+        if abs(r) < 1e12 and abs(r * 1e6 - round(r * 1e6)) < 1e-6:
+            return _num(r)
+    if a[0] == "bin" and a[1] == "^" and _exponente_entero(a[3]) and _exponente_entero(b):
+        return _elevar(a[2], _num(_valor(a[3]) * vb))  # (x²)² = x⁴ (con exponentes enteros)
+    return ("bin", "^", a, b, False)
+
+
+def _f(nombre, argumento):
+    return ("func", nombre, argumento)
+
+
+def _derivar_funcion(nombre, u, du):
+    """Regla de la cadena: d/dx g(u) = g'(u)·u'."""
+    dos = _num(2)
+    raiz_1_menos_u2 = _f("sqrt", _resta(_num(1), _elevar(u, dos)))
+    if nombre in ("sen", "sin"):
+        g = _f("cos", u)
+    elif nombre == "cos":
+        g = _neg(_f("sen", u))
+    elif nombre in ("tan", "tg"):
+        g = _elevar(_f("sec", u), dos)
+    elif nombre == "sec":
+        g = _producto(_f("sec", u), _f("tan", u))
+    elif nombre == "csc":
+        g = _neg(_producto(_f("csc", u), _f("cot", u)))
+    elif nombre in ("cot", "ctg"):
+        g = _neg(_elevar(_f("csc", u), dos))
+    elif nombre in ("arcsen", "arcsin", "asin"):
+        return _cociente(du, raiz_1_menos_u2)
+    elif nombre in ("arccos", "acos"):
+        return _neg(_cociente(du, raiz_1_menos_u2))
+    elif nombre in ("arctan", "arctg", "atan"):
+        return _cociente(du, _suma(_num(1), _elevar(u, dos)))
+    elif nombre in ("senh", "sinh"):
+        g = _f("cosh", u)
+    elif nombre == "cosh":
+        g = _f("senh", u)
+    elif nombre == "tanh":
+        return _cociente(du, _elevar(_f("cosh", u), dos))
+    elif nombre == "exp":
+        g = _f("exp", u)
+    elif nombre == "ln":
+        return _cociente(du, u)
+    elif nombre in ("log", "log10", "log2"):
+        base = 2 if nombre == "log2" else 10
+        return _cociente(du, _producto(u, _f("ln", _num(base))))
+    elif nombre in ("sqrt", "raiz"):
+        return _cociente(du, _producto(dos, _f("sqrt", u)))
+    elif nombre == "cbrt":
+        return _cociente(du, _producto(_num(3), _elevar(_f("cbrt", u), dos)))
+    else:  # abs: d|u| = u'·u / |u|
+        return _producto(du, _cociente(u, ("abs", u)))
+    return _producto(du, g)
+
+
+def derivar(nodo):
+    """Devuelve el arbol de la derivada de nodo respecto a x, ya simplificado."""
+    if not _tiene_x(nodo):
+        return _num(0)
+    tipo = nodo[0]
+    if tipo == "x":
+        return _num(1)
+    if tipo == "neg":
+        return _neg(derivar(nodo[1]))
+    if tipo == "abs":
+        return _derivar_funcion("abs", nodo[1], derivar(nodo[1]))
+    if tipo == "func":
+        return _derivar_funcion(nodo[1], nodo[2], derivar(nodo[2]))
+    op, u, v = nodo[1], nodo[2], nodo[3]
+    if op == "+":
+        return _suma(derivar(u), derivar(v))
+    if op == "-":
+        return _resta(derivar(u), derivar(v))
+    if op == "*":
+        if not _tiene_x(u):          # (c·v)' = c·v'
+            return _producto(u, derivar(v))
+        if not _tiene_x(v):
+            return _producto(v, derivar(u))
+        return _suma(_producto(derivar(u), v), _producto(u, derivar(v)))
+    if op == "/":
+        if not _tiene_x(v):          # (u/c)' = u'/c
+            return _cociente(derivar(u), v)
+        cuadrado = _elevar(v, _num(2))
+        if not _tiene_x(u):          # (c/v)' = −c·v'/v²
+            return _neg(_cociente(_producto(u, derivar(v)), cuadrado))
+        return _cociente(_resta(_producto(derivar(u), v), _producto(u, derivar(v))), cuadrado)
+    # Potencia
+    if not _tiene_x(v):              # (uⁿ)' = n·uⁿ⁻¹·u'
+        p, q = (_valor(v[2]), _valor(v[3])) if v[0] == "bin" and v[1] == "/" else (None, None)
+        if p is not None and q not in (None, 0):
+            n_menos_1 = _cociente(_num(p - q), _num(q))   # x^(1/3) -> x^(−2/3), sin decimales periodicos
+        else:
+            n_menos_1 = _resta(v, _num(1))
+        return _producto(_producto(v, _elevar(u, n_menos_1)), derivar(u))
+    if not _tiene_x(u):              # (aᵛ)' = v'·aᵛ·ln a   (con a = e, ln e = 1)
+        factor = nodo if u == ("const", "e") else _producto(nodo, _f("ln", u))
+        return _producto(derivar(v), factor)
+    # (uᵛ)' = uᵛ·(v'·ln u + v·u'/u)
+    return _producto(nodo, _suma(_producto(derivar(v), _f("ln", u)), _cociente(_producto(v, derivar(u)), u)))
+
+
+# Texto legible (y que el mismo analizador vuelve a leer): 3x² − 1, −sen(x) − 1, 1/(2√(x))
+_SUPERINDICE = str.maketrans("0123456789-", "⁰¹²³⁴⁵⁶⁷⁸⁹⁻")
+
+
+def _exponente_entero(nodo):
+    v = _valor(nodo)
+    return v is not None and v == int(v) and abs(v) < 1000
+
+
+def _tx(nodo):
+    """Devuelve (texto, prioridad): 1 suma/resta, 2 producto/cociente, 3 negativo, 4 potencia, 5 atomo."""
+    tipo = nodo[0]
+    if tipo == "num":
+        return nodo[2], 5
+    if tipo == "x":
+        return "x", 5
+    if tipo == "const":
+        return ("π" if nodo[1] == "pi" else "e"), 5
+    if tipo == "abs" or (tipo == "func" and nodo[1] == "abs"):
+        return "|" + _tx(nodo[1] if tipo == "abs" else nodo[2])[0] + "|", 5
+    if tipo == "func":
+        nombre = "√" if nodo[1] in ("sqrt", "raiz") else nodo[1]
+        return f"{nombre}({_tx(nodo[2])[0]})", 5
+    if tipo == "neg":
+        texto, prio = _tx(nodo[1])
+        return "−" + (texto if prio >= 2 else f"({texto})"), 3
+
+    op = nodo[1]
+    (ti, pi_), (td, pd) = _tx(nodo[2]), _tx(nodo[3])
+    if op == "^":
+        if _exponente_entero(nodo[3]):
+            exponente = _formato(_valor(nodo[3])).translate(_SUPERINDICE)
+            if nodo[2][0] == "func" and nodo[2][1] not in ("abs", "sqrt", "raiz"):
+                # sec²(x): el analizador lo lee como (sec x)²
+                return ti.replace("(", exponente + "(", 1), 4
+        else:
+            exponente = "^" + (td if pd >= 5 else f"({td})")
+        base = ti if pi_ >= 5 and nodo[2][0] != "func" else f"({ti})"
+        return base + exponente, 4
+    if op == "*":
+        izq = ti if pi_ >= 2 else f"({ti})"
+        der = td if pd >= 3 and nodo[3][0] != "neg" else f"({td})"
+        if nodo[2][0] == "num" and nodo[3][0] == "bin" and nodo[3][1] == "*":
+            der = td  # 2x·sen(x) en lugar de 2(x·sen(x)): el producto es asociativo
+        # 3x², 2cos(x): el numero se escribe pegado (como en el cuaderno)
+        if nodo[2][0] == "num" and (der[0].isalpha() or der[0] in "(|√π"):
+            return izq + der, 2
+        return izq + "·" + der, 2
+    if op == "/":
+        izq = ti if pi_ >= 2 else f"({ti})"
+        der = td if pd >= 4 else f"({td})"
+        return izq + "/" + der, 2
+    der = td if pd > 1 and nodo[3][0] != "neg" else f"({td})"
+    return ti + (" + " if op == "+" else " − ") + der, 1
+
+
+def a_texto(arbol):
+    return _tx(arbol)[0]
+
+
 class Funcion:
     """Funcion lista para evaluar, con su texto original y su version bonita."""
 
-    def __init__(self, texto, latex=False):
+    def __init__(self, texto, latex=False, nombre=r"f(x)"):
         self.original = texto.strip()
         if latex:
             texto = latex_a_texto(texto)
@@ -479,8 +829,29 @@ class Funcion:
         self.normalizada = normalizar(texto)
         self.arbol = _Analizador(tokenizar(self.normalizada)).analizar()
         self._f = _compilar(self.arbol)
-        self.mathtext = "$f(x) = " + _mt(self.arbol)[0] + "$"
+        self.mathtext = f"${nombre} = " + _mt(self.arbol)[0] + "$"
         self.javascript = _js(self.arbol)  # expresion en x para la grafica interactiva
+        self.legible = a_texto(self.arbol)
+        self._derivada = None
+
+    @classmethod
+    def desde_arbol(cls, arbol, nombre=r"f^{\prime}(x)"):
+        """Funcion armada directamente desde un arbol (por ejemplo, el de una derivada)."""
+        funcion = cls.__new__(cls)
+        funcion.arbol = arbol
+        funcion.legible = funcion.texto = funcion.original = a_texto(arbol)
+        funcion.normalizada = None
+        funcion._f = _compilar(arbol)
+        funcion.mathtext = f"${nombre} = " + _mt(arbol)[0] + "$"
+        funcion.javascript = _js(arbol)
+        funcion._derivada = None
+        return funcion
+
+    def derivada(self):
+        """f'(x) calculada con las reglas de derivacion (se guarda para no repetir el calculo)."""
+        if self._derivada is None:
+            self._derivada = Funcion.desde_arbol(derivar(self.arbol))
+        return self._derivada
 
     def __call__(self, x):
         return self._f(x)

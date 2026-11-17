@@ -198,6 +198,7 @@
       }, { passive: false });
 
       c.addEventListener('dblclick', (ev) => {
+        clearTimeout(this.clicPendiente);  // el doble clic acerca: no elige un valor inicial
         const [px, py] = local(ev);
         this.zoom(0.5, px, py);
       });
@@ -205,6 +206,7 @@
       c.addEventListener('pointerdown', (ev) => {
         c.setPointerCapture(ev.pointerId);
         this.punteros.set(ev.pointerId, local(ev));
+        this.inicioClic = this.punteros.size === 1 ? local(ev) : null;
         this.caja.classList.add('arrastrando');
       });
 
@@ -233,9 +235,49 @@
         this.punteros.delete(ev.pointerId);
         if (!this.punteros.size) this.caja.classList.remove('arrastrando');
       };
+      // Clic sin arrastrar: elige un valor inicial (metodos abiertos). Se espera un poco por si es doble clic.
+      c.addEventListener('pointerup', (ev) => {
+        const inicio = this.inicioClic;
+        this.inicioClic = null;
+        if (!inicio || !this.datos.eleccion || ev.type !== 'pointerup') return;
+        const [px, py] = local(ev);
+        if (Math.hypot(px - inicio[0], py - inicio[1]) > 4) return;  // fue un arrastre
+        clearTimeout(this.clicPendiente);
+        this.clicPendiente = setTimeout(() => this.elegir(px), 260);
+      });
       c.addEventListener('pointerup', soltar);
       c.addEventListener('pointercancel', soltar);
       c.addEventListener('pointerleave', () => { this.cursor = null; this.dibujar(); });
+    }
+
+    // x del clic redondeada segun el zoom (con la vista de 1 a 2 se elige 1.53, no 1.5317204...)
+    elegir(px) {
+      const v = this.vista;
+      const paso = Math.pow(10, Math.floor(Math.log10((v.x1 - v.x0) / 200)));
+      const decimales = Math.max(0, -Math.floor(Math.log10(paso)));
+      const x = parseFloat((Math.round(this.xDe(px) / paso) * paso).toFixed(Math.min(decimales, 12)));
+      if (window.emitEvent) window.emitEvent(this.datos.eleccion, { x });
+    }
+
+    // Cambia solo las marcas de los valores iniciales (sin rehacer la grafica ni perder el zoom)
+    marcar(marcas) {
+      this.datos = { ...this.datos, marcas };
+      this.dibujar();
+    }
+
+    marcas() {
+      const ctx = this.ctx;
+      for (const m of this.datos.marcas || []) {
+        const px = this.X(m.x);
+        if (px < 0 || px > this.ancho) continue;
+        const y = this.f(m.x);
+        ctx.strokeStyle = 'rgba(37, 99, 235, 0.75)'; ctx.lineWidth = 1.6; ctx.setLineDash([5, 4]);
+        ctx.beginPath(); ctx.moveTo(px + 0.5, 0); ctx.lineTo(px + 0.5, this.alto); ctx.stroke(); ctx.setLineDash([]);
+        this.punto(m.x, 0, '#2563eb', 4);
+        if (Number.isFinite(y)) this.punto(m.x, y, '#2563eb', 6);
+        const py = Number.isFinite(y) ? Math.max(30, Math.min(this.alto - 30, this.Y(y))) : this.alto / 2;
+        this.burbuja(m.texto, px, py);
+      }
     }
 
     // ---------------- Dibujo ----------------
@@ -257,6 +299,7 @@
       this.asintotas();
       this.curva();
       this.raices();
+      this.marcas();
       this.puntoCursor();
     }
 
@@ -462,11 +505,13 @@
 
     puntoCursor() {
       if (!this.cursor) {
-        this.lectura.textContent = 'Rueda: zoom · arrastrar: mover · Shift + rueda: solo eje x · doble clic: acercar';
+        this.lectura.textContent = this.datos.ayuda ||
+          'Rueda: zoom · arrastrar: mover · Shift + rueda: solo eje x · doble clic: acercar';
         return;
       }
       const x = this.xDe(this.cursor[0]), y = this.f(x);
-      this.lectura.textContent = `x = ${numeroCorto(x)}    f(x) = ${numeroCorto(y)}`;
+      this.lectura.textContent = `x = ${numeroCorto(x)}    f(x) = ${numeroCorto(y)}` +
+        (this.datos.eleccion ? '    · clic: elegir este valor' : '');
       if (!Number.isFinite(y)) return;
       const ctx = this.ctx, px = this.X(x), py = this.Y(y);
       ctx.strokeStyle = 'rgba(58, 58, 60, 0.35)'; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
@@ -485,6 +530,10 @@
       }
       if (caja._plano) caja._plano.actualizar(datos);
       else caja._plano = new Plano(caja, datos);
+    },
+    marcar(id, marcas) {
+      const caja = document.getElementById(id);
+      if (caja && caja._plano) caja._plano.marcar(marcas);
     },
   };
 })();

@@ -75,12 +75,12 @@ def construir(vista):
     def con_otros_decimales():
         """Redibuja la explicacion y la tabla con la nueva cantidad de decimales."""
         detalle.refresh()
-        tabla.set_content(tabla_iteraciones(r, e.decimales, e.iteracion_vista, vista.PREFIJO))
+        tabla.set_content(vista.tabla_iteraciones(r, e.decimales, e.iteracion_vista))
 
     with caja("fila").style("justify-content:space-between; align-items:center; margin-top:18px"):
         subtitulo("Tabla de iteraciones").style("margin:0")
         decimales.control(vista, con_otros_decimales)
-    tabla = html(tabla_iteraciones(r, e.decimales, e.iteracion_vista, vista.PREFIJO), "contenedor-tabla mono").style("margin-top:10px")
+    tabla = html(vista.tabla_iteraciones(r, e.decimales, e.iteracion_vista), "contenedor-tabla mono").style("margin-top:10px")
     vista.pasos_guia.append((tabla, "Tabla de iteraciones",
                              "Resumen de todas las iteraciones. La columna en azul es el error del criterio; "
                              "haga clic en una fila para ver su explicación."))

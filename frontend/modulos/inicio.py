@@ -40,7 +40,7 @@ ILUSTRACION = """
 PASOS = [
     ("edit", "Escriba f(x)", "Con el editor matemático, tal como en el cuaderno: x⁴ − 5x³ + 0.5x² …"),
     ("travel_explore", "Explore la gráfica", "Acerque, aleje y mueva el plano; los intervalos con cambio de signo se marcan solos."),
-    ("tune", "Elija [a, b] y E", "Se comprueba Bolzano: f continua y f(a)·f(b) < 0 antes de iterar."),
+    ("tune", "Elija [a, b] o x₀ y E", "Cerrados: se comprueba Bolzano. Abiertos: basta un valor inicial (y f'(x) se calcula sola)."),
     ("checklist", "Vea cada iteración", "Tabla completa, explicación de cada cálculo y la conclusión con su error."),
 ]
 
@@ -56,7 +56,8 @@ def construir(grupos, abrir):
             html("<p>Escriba la función como en el cuaderno, explore su gráfica y siga cada iteración "
                  "explicada paso a paso, desde la tabulación hasta la raíz.</p>")
             with caja("fila").style("gap:10px; margin-top:22px"):
-                boton("Empezar con Regla Falsa", lambda: abrir("regla_falsa"), icono="timeline", principal=True)
+                boton("Empezar con Newton-Raphson", lambda: abrir("newton"), icono="trending_up", principal=True)
+                boton("Método de la Secante", lambda: abrir("secante"), icono="insights")
                 boton("Método de Bisección", lambda: abrir("biseccion"), icono="my_location")
         html(ILUSTRACION, "hero-ilustracion")
 

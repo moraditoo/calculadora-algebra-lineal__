@@ -6,7 +6,7 @@ from nicegui import ui
 
 from .componentes import caja, html
 from .formato import escapar
-from .modulos import biseccion, conversor, ecuaciones, inicio, matrices, regla_falsa, romanos, vectores
+from .modulos import abiertos, biseccion, conversor, ecuaciones, inicio, matrices, regla_falsa, romanos, vectores
 
 
 class Modulo(NamedTuple):
@@ -23,8 +23,12 @@ GRUPOS = [
     ("Métodos numéricos", [
         Modulo("biseccion", "Método de Bisección", "my_location", biseccion.construir, False,
                "Encierra la raíz en [a, b] y lo parte a la mitad hasta que el error sea menor que E."),
-        Modulo("regla_falsa", "Método de Regla Falsa", "timeline", regla_falsa.construir, True,
+        Modulo("regla_falsa", "Método de Regla Falsa", "timeline", regla_falsa.construir, False,
                "Une (a, f(a)) y (b, f(b)) con una recta y usa su corte con el eje x. Incluye la variante modificada."),
+        Modulo("newton", "Método de Newton-Raphson", "trending_up", abiertos.construir_newton, True,
+               "Método abierto: desde x₀ sigue la recta tangente. Calcula f'(x) automáticamente."),
+        Modulo("secante", "Método de la Secante", "insights", abiertos.construir_secante, True,
+               "Método abierto: con x₀ y x₁ traza la recta secante, sin necesitar la derivada."),
     ]),
     ("Álgebra lineal", [
         Modulo("ecuaciones", "Ecuaciones lineales", "functions", ecuaciones.construir, False,

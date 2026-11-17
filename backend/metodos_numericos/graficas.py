@@ -254,3 +254,125 @@ def grafica_error(resultado):
     ax.xaxis.get_major_locator().set_params(integer=True)
     return a_svg(fig)
 
+
+
+# ----------------------------------------------------------------------
+# Metodos abiertos (Newton-Raphson y secante)
+# ----------------------------------------------------------------------
+def _ventana(xs, minimo=1e-9):
+    """Rango de x que muestra todos los puntos con un margen alrededor."""
+    bajo, alto = min(xs), max(xs)
+    ancho = max(alto - bajo, minimo * max(1.0, abs(alto)))
+    return bajo - 0.35 * ancho, alto + 0.35 * ancho
+
+
+def _recta(ax, x0, y0, pendiente, x_min, x_max, estilo=(0, (6, 3)), alpha=0.85):
+    ax.plot([x_min, x_max], [y0 + pendiente * (x_min - x0), y0 + pendiente * (x_max - x0)],
+            color=ACENTO, linewidth=1.6, linestyle=estilo, alpha=alpha, zorder=4)
+
+
+def _nueva_aproximacion(ax, it, nombre):
+    """El corte con el eje x (x de la siguiente iteracion) y su valor de f."""
+    x_nuevo, f_nuevo = it["x_nuevo"], it["f_nuevo"]
+    ax.vlines(x_nuevo, min(0, f_nuevo), max(0, f_nuevo), color=ACENTO, linewidth=1, linestyle=(0, (2, 2)), zorder=4)
+    ax.scatter([x_nuevo], [0], s=50, marker="D", color=ACENTO, edgecolors=BLANCO, linewidths=1.2, zorder=8)
+    _etiqueta(ax, x_nuevo, 0, f"{nombre} = {x_nuevo:.8f}", (-70, 34) if it["fx"] < 0 else (-70, -44))
+
+
+def _punto_curva(ax, x, y, nombre):
+    ax.vlines(x, min(0, y), max(0, y), color=SUAVE, linewidth=1, linestyle=(0, (4, 3)), zorder=2)
+    ax.scatter([x], [y], s=60, color=_color_signo(y) if y else ACENTO, edgecolors=BLANCO, linewidths=1.4, zorder=6)
+    ax.annotate(nombre, (x, 0), xytext=(0, 10 if y < 0 else -16), textcoords="offset points", ha="center",
+                color=TINTA, fontsize=10, fontweight="bold")
+
+
+def _subindice(n):
+    return "x" + str(n).translate(str.maketrans("0123456789", "₀₁₂₃₄₅₆₇₈₉"))
+
+
+def grafica_newton(f, it):
+    """Una iteracion de Newton-Raphson: la tangente en (xₙ, f(xₙ)) corta el eje x en xₙ₊₁."""
+    x, fx, n = it["x"], it["fx"], it["n"]
+    fig = Figure(figsize=(7.4, 3.9), dpi=100)
+    ax = fig.add_subplot()
+    _ejes(ax)
+    x_min, x_max = _ventana([x, it["x_nuevo"]])
+    _curva(ax, f, x_min, x_max, 500)
+    if it["dfx"] is not None and not it.get("exacta"):
+        _recta(ax, x, fx, it["dfx"], x_min, x_max)
+    _punto_curva(ax, x, fx, _subindice(n))
+    if not it.get("exacta"):
+        _nueva_aproximacion(ax, it, _subindice(n + 1))
+    ax.ticklabel_format(useOffset=False, axis="x")
+    ax.locator_params(axis="x", nbins=5)
+    return a_svg(fig)
+
+
+def grafica_secante(f, it):
+    """Una iteracion de la secante: la recta por (xₙ₋₁, f(xₙ₋₁)) y (xₙ, f(xₙ)) corta el eje x en xₙ₊₁."""
+    x, fx, n = it["x"], it["fx"], it["n"]
+    x_ant, f_ant = it["x_anterior"], it["f_anterior"]
+    fig = Figure(figsize=(7.4, 3.9), dpi=100)
+    ax = fig.add_subplot()
+    _ejes(ax)
+    x_min, x_max = _ventana([x_ant, x, it["x_nuevo"]])
+    _curva(ax, f, x_min, x_max, 500)
+    if it.get("pendiente") is not None:
+        _recta(ax, x, fx, it["pendiente"], x_min, x_max)
+    _punto_curva(ax, x_ant, f_ant, _subindice(n - 1))
+    _punto_curva(ax, x, fx, _subindice(n))
+    if not it.get("exacta"):
+        _nueva_aproximacion(ax, it, _subindice(n + 1))
+    ax.ticklabel_format(useOffset=False, axis="x")
+    ax.locator_params(axis="x", nbins=5)
+    return a_svg(fig)
+
+
+def grafica_recorrido(f, resultado, maximo=10):
+    """Todas las tangentes (o secantes) seguidas: como se van acercando las aproximaciones a la raiz."""
+    iteraciones = resultado["iteraciones"][:maximo]
+    secante = resultado["metodo"] == "secante"
+    puntos = [it["x"] for it in iteraciones] + [it["x_nuevo"] for it in iteraciones]
+    if secante:
+        puntos += [it["x_anterior"] for it in iteraciones]
+    # Si el metodo diverge, los puntos lejanos no deben aplastar la grafica
+    raiz = resultado["raiz"]
+    cercanos = [x for x in puntos if abs(x - raiz) <= 50 * max(1.0, abs(puntos[0] - raiz))]
+    x_min, x_max = _ventana(cercanos or puntos)
+
+    fig = Figure(figsize=(9.6, 4.4), dpi=100)
+    ax = fig.add_subplot()
+    _ejes(ax)
+    _curva(ax, f, x_min, x_max)
+    total = len(iteraciones)
+    etiquetadas = []  # x ya rotuladas: no se escribe otra encima
+    separacion = 0.05 * (x_max - x_min)
+    for indice, it in enumerate(iteraciones):
+        if it.get("exacta"):
+            continue
+        alpha = 0.35 + 0.55 * (indice + 1) / total
+        x, fx = it["x"], it["fx"]
+        ax.vlines(x, min(0, fx), max(0, fx), color=SUAVE, linewidth=1, linestyle=(0, (3, 3)), zorder=2)
+        origen = (it["x_anterior"], it["f_anterior"]) if secante else (x, fx)
+        ax.plot([origen[0], it["x_nuevo"]], [origen[1], 0], color=ACENTO, linewidth=1.5, alpha=alpha, zorder=4,
+                linestyle=(0, (6, 3)))
+        if secante:
+            ax.plot([origen[0], x], [origen[1], fx], color=ACENTO, linewidth=1.5, alpha=alpha, zorder=4)
+        ax.scatter([x], [fx], s=34, color=_color_signo(fx), edgecolors=BLANCO, linewidths=1.1, zorder=6)
+        if x_min <= x <= x_max and all(abs(x - otra) > separacion for otra in etiquetadas):
+            etiquetadas.append(x)
+            ax.annotate(_subindice(it["n"]), (x, 0), xytext=(0, 9 if fx < 0 else -15), textcoords="offset points",
+                        ha="center", color=TINTA, fontsize=9, fontweight="bold")
+    if secante and iteraciones:
+        primero = iteraciones[0]
+        ax.scatter([primero["x_anterior"]], [primero["f_anterior"]], s=34, color=_color_signo(primero["f_anterior"]),
+                   edgecolors=BLANCO, linewidths=1.1, zorder=6)
+        ax.annotate(_subindice(0), (primero["x_anterior"], 0), xytext=(0, 9 if primero["f_anterior"] < 0 else -15),
+                    textcoords="offset points", ha="center", color=TINTA, fontsize=9, fontweight="bold")
+    if x_min <= raiz <= x_max:
+        _punto_raiz(ax, raiz, resultado["f_raiz"])
+        texto = "raíz" if resultado["convergio"] else "última aproximación"
+        _etiqueta(ax, raiz, resultado["f_raiz"], f"{texto} ≈ {raiz:.8f}")
+    ax.set_xlabel("x")
+    ax.set_ylabel("f(x)")
+    return a_svg(fig)

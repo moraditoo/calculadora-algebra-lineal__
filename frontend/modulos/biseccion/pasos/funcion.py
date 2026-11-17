@@ -7,7 +7,6 @@ from nicegui import ui
 
 from ....componentes import aviso, boton, caja, campo, html, segmentado, subtitulo
 from ....formato import escapar
-from ..estado import NOMBRE_ERROR
 
 
 def construir(vista):
@@ -87,6 +86,7 @@ def construir(vista):
                                      "Aquí se ve la función exactamente como la va a usar el método. Revise que coincida con la que escribió."))
 
         vista_previa()
+        vista.despues_de_formula()
 
         aviso("Funciones disponibles: sen, cos, tan, ln (natural), log (base 10), e^x, sqrt, |x| y pi. "
               "Se puede escribir 5x en lugar de 5·x.", "info").style("margin-top:14px")
@@ -118,8 +118,7 @@ def ejemplos_resueltos(vista):
                 html(f'<div class="opcion-titulo">{escapar(ejemplo["titulo"])}</div>'
                      f'<div class="ejemplo-funcion mono">f(x) = {escapar(ejemplo["texto"])}</div>'
                      f'<div class="opcion-detalle">{escapar(ejemplo["detalle"])}</div>'
-                     f'<div class="opcion-extra mono">[{ejemplo["a"]:g}, {ejemplo["b"]:g}] · '
-                     f'{escapar(NOMBRE_ERROR[ejemplo["criterio"]])} &lt; {escapar(ejemplo["tolerancia"])}</div>')
+                     f'<div class="opcion-extra mono">{vista.resumen_ejemplo(ejemplo)}</div>')
                 with caja("fila").style("gap:6px"):
                     boton("Graficar", lambda ej=ejemplo: vista.cargar_ejemplo(ej), icono="show_chart", clases="compacto")
                     boton("Resolver", lambda ej=ejemplo: vista.cargar_ejemplo(ej, resolver=True),

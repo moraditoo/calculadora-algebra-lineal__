@@ -28,7 +28,36 @@ def datos_plano(vista):
         "raices": raices,
         "clave": vista.PREFIJO,                  # la vista (zoom) se recuerda por metodo
         "evento": f"{vista.PREFIJO}_vista",      # avisa al servidor que rango se esta viendo
+        **vista.datos_plano_extra(),             # metodos abiertos: clic para elegir x0 y sus marcas
     }
+
+
+def explicacion_intervalos(vista, t):
+    """De donde salen los intervalos I1, I2...: la tabulacion de f(x) y el cambio de signo (Bolzano)."""
+    h = t["paso"]
+    pasos = [
+        f"<b>Se tabula f(x)</b> desde x mín = {t['x_min']:g} hasta x máx = {t['x_max']:g} en "
+        f"n = {t['subintervalos']} subintervalos del mismo ancho: "
+        f"<b>h = (x máx − x mín) / n = ({t['x_max']:g} − ({t['x_min']:g})) / {t['subintervalos']} = {h:g}</b>.",
+        f"Se evalúa f en cada punto <b>xᵢ = x mín + i·h</b> ({t['x_min']:g}, {t['x_min'] + h:g}, "
+        f"{t['x_min'] + 2 * h:g}, …). Es la tabla «Tabulación de f(x)» de abajo.",
+        "Se comparan los signos de dos puntos seguidos. Si <b>f(xᵢ)·f(xᵢ₊₁) &lt; 0</b> la curva pasó de un lado "
+        "al otro del eje x: por el <b>teorema de Bolzano</b> (f continua) hay al menos una raíz en [xᵢ, xᵢ₊₁]. "
+        "Ese subintervalo es I1, I2, …",
+    ]
+    if t["intervalos"]:
+        iv = t["intervalos"][0]
+        if iv["exacta"] is None:
+            pasos.append(f"Por ejemplo I{iv['numero']} = [{iv['a']:g}, {iv['b']:g}]: f({iv['a']:g}) = {con_signo(iv['fa'], 4)} "
+                         f"y f({iv['b']:g}) = {con_signo(iv['fb'], 4)} tienen signos distintos, así que la raíz está entre "
+                         f"{iv['a']:g} y {iv['b']:g}.")
+        else:
+            pasos.append(f"Por ejemplo I{iv['numero']}: en la tabla f({iv['exacta']:g}) = 0, así que x = {iv['exacta']:g} "
+                         "ya es una raíz exacta.")
+    pasos.append(vista.NOTA_INTERVALOS)
+    lista = "".join(f"<li>{p}</li>" for p in pasos)
+    return desplegable_html("¿De dónde salen los intervalos?", f'<ol class="texto-suave" style="margin:6px 0 0 18px; '
+                            f'line-height:1.65">{lista}</ol>', abierto=True)
 
 
 def construir(vista):
@@ -100,18 +129,20 @@ def construir(vista):
                                      "Pase el cursor para ver f(x) en cada punto."))
 
             subtitulo("Intervalos con cambio de signo: f(a)·f(b) < 0")
+            explicacion = html(explicacion_intervalos(vista, t))
+            vista.pasos_guia.append((explicacion, "De dónde salen los intervalos",
+                                     "Se tabula f(x) con paso h y se buscan dos puntos seguidos con signos distintos."))
             if t["intervalos"]:
-                with caja("rejilla tres") as lista:
+                with caja("rejilla tres").style("margin-top:10px") as lista:
                     for iv in t["intervalos"]:
                         tarjeta_intervalo(iv)
-                vista.pasos_guia.append((lista, "Elegir el intervalo",
-                                         "Haga clic en el intervalo que quiere resolver. f(a) y f(b) tienen signos distintos: "
-                                         "por el teorema de Bolzano hay una raíz dentro."))
+                vista.pasos_guia.append((lista, "Elegir el intervalo", vista.AYUDA_TARJETAS))
             else:
                 with caja("fila").style("align-items:center; gap:12px"):
                     aviso("No hay cambios de signo en este rango. Use «Rango automático», amplíe el rango "
                           "o aumente los subintervalos.", "advertencia").style("flex:1")
                     boton("Rango automático", lambda: graficar(ajustar_rango=True), icono="auto_fix_high")
+            vista.panel_bajo_intervalos(resultados.refresh)
 
             n_sugerido = t["subintervalos_sugeridos"]
             if n_sugerido:
@@ -138,7 +169,7 @@ def construir(vista):
                       + vista.AVISO_RAIZ_EXACTA, "exito").style("margin-top:10px")
             if t["raices_que_tocan"]:
                 aviso(f"En x = {', '.join(f'{x:g}' for x in t['raices_que_tocan'])} la curva toca el eje sin cruzarlo "
-                      f"(raíz doble): f no cambia de signo, así que el método de {vista.NOMBRE} no puede encerrar esa raíz.",
+                      f"(raíz doble): f no cambia de signo, " + vista.AVISO_RAIZ_DOBLE.format(nombre=vista.NOMBRE),
                       "info").style("margin-top:10px")
             if t["puntos_indefinidos"]:
                 aviso(f"f(x) no está definida en {t['puntos_indefinidos']} punto(s) del rango "
@@ -150,12 +181,11 @@ def construir(vista):
 
         with caja("fila").style("justify-content:space-between; margin-top:18px"):
             boton("Anterior", lambda: vista.ir_a(1), icono="arrow_back")
-            activo = e.intervalo_activo
+            principal, secundario = vista.textos_continuar()
             with caja("fila").style("gap:8px"):
-                if activo:
-                    boton("Escribir mi propio intervalo", lambda: vista.ir_a(3), icono="edit")
-                boton(f"Continuar con I{activo}" if activo else "Escribir el intervalo a mano",
-                      lambda: vista.ir_a(3), icono="arrow_forward", principal=True)
+                if secundario:
+                    boton(secundario, lambda: vista.ir_a(3), icono="edit")
+                boton(principal, lambda: vista.ir_a(3), icono="arrow_forward", principal=True)
 
     def tarjeta_intervalo(iv):
         activa = iv["numero"] == e.intervalo_activo

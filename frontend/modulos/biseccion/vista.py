@@ -34,11 +34,14 @@ class VistaBiseccion:
                      "hasta que el error sea menor que E.")
     AVISO_RAIZ_EXACTA = ("esa raíz ya es exacta y bisección la confirma en la primera iteración (f(c) = 0). "
                          "Para ver más iteraciones use «Rango automático» o cambie los subintervalos.")
+    AVISO_RAIZ_DOBLE = "así que el método de {nombre} no puede encerrar esa raíz."
     INTRO_ITERACIONES = ("Cada iteración divide el intervalo a la mitad y se queda con la mitad donde f cambia de signo. "
                          "Use las flechas, el control deslizante, la tabla o <b>Reproducir</b>.")
     EXPLICACION_RENGLON = iteraciones.EXPLICACION_RENGLON
     PASOS_DIBUJO = {1: funcion.construir, 2: grafica.construir, 3: parametros.construir,
                     4: iteraciones.construir, 5: conclusion.construir, 6: algoritmo.construir}
+    NOMBRES_ERROR = NOMBRE_ERROR            # nombre corto de cada criterio de parada
+    PUNTO = "c"                             # como se llama la aproximacion en las tarjetas: f(c) = ...
 
     def calcular(self, f):
         e = self.estado
@@ -51,11 +54,46 @@ class VistaBiseccion:
     def grafica_de_iteracion(self, f, it):
         return graficas.grafica_iteracion(f, it)
 
+    def grafica_resumen(self, f, resultado):
+        """Grafica de todas las iteraciones juntas (en biseccion, la escalera de intervalos)."""
+        return graficas.grafica_iteraciones(f, resultado)
+
+    def tabla_iteraciones(self, r, d, actual):
+        return iteraciones.tabla_iteraciones(r, d, actual, self.PREFIJO)
+
+    def resumen_ejemplo(self, ejemplo):
+        """Ultima linea de la tarjeta de un ejemplo resuelto (paso 1)."""
+        return (f'[{ejemplo["a"]:g}, {ejemplo["b"]:g}] · '
+                f'{escapar(self.NOMBRES_ERROR[ejemplo["criterio"]])} &lt; {escapar(ejemplo["tolerancia"])}')
+
+    def despues_de_formula(self):
+        """Algo mas que dibujar en el paso 1 debajo de la funcion (biseccion no tiene)."""
+
     def opciones_metodo(self):
         """Controles extra del paso 3 propios de cada metodo (biseccion no tiene)."""
 
     def aviso_conclusion(self, resultado):
         """Observacion extra del paso 5 propia de cada metodo (biseccion no tiene)."""
+
+    # Paso 2: lo que cambia entre metodos cerrados y abiertos
+    NOTA_INTERVALOS = ("En un método cerrado el intervalo elegido es el [a, b] inicial: se conserva el cambio de signo "
+                       "en cada iteración y por eso la convergencia está garantizada.")
+    AYUDA_TARJETAS = ("Haga clic en el intervalo que quiere resolver. f(a) y f(b) tienen signos distintos: "
+                      "por el teorema de Bolzano hay una raíz dentro.")
+
+    def datos_plano_extra(self):
+        """Datos extra para la grafica interactiva (biseccion no tiene)."""
+        return {}
+
+    def panel_bajo_intervalos(self, refrescar):
+        """Algo mas que dibujar debajo de las tarjetas de intervalos (biseccion no tiene)."""
+
+    def textos_continuar(self):
+        """(boton principal, boton secundario o None) al final del paso 2."""
+        activo = self.estado.intervalo_activo
+        if activo:
+            return f"Continuar con I{activo}", "Escribir mi propio intervalo"
+        return "Escribir el intervalo a mano", None
 
     def __init__(self):
         self.estado = self.ESTADO.desde_ejemplo(self.EJEMPLOS[0])
@@ -115,13 +153,19 @@ class VistaBiseccion:
         d = self.estado.decimales
         animar = " numero-nuevo" if self.kpi_recien_calculado else ""
         self.kpi_recien_calculado = False
+        if r and "veredicto" in r:   # metodos abiertos: converge o diverge
+            estado_metodo = {"converge": "Converge", "lenta": "Converge lento (sin llegar a E)",
+                             "diverge": "Diverge"}[r["veredicto"]["tipo"]]
+        elif r:
+            estado_metodo = "Converge" if r["convergio"] else "No converge"
+        else:
+            estado_metodo = "Sin calcular"
         datos = [
-            ("Iteraciones", str(r["total_iteraciones"]) if r else "—",
-             ("Converge" if r["convergio"] else "No converge") if r else "Sin calcular"),
+            ("Iteraciones", str(r["total_iteraciones"]) if r else "—", estado_metodo),
             ("Raíz aproximada", numero(r["raiz"], d) if r else "—",
-             f"f(c) = {con_signo(r['f_raiz'], 6)}" if r else "Complete el paso 3"),
+             f"f({self.PUNTO}) = {con_signo(r['f_raiz'], 6)}" if r else "Complete el paso 3"),
             ("Error", numero(r["error_final"], d) if r else "—",
-             f"{NOMBRE_ERROR[r['criterio']]} < E = {r['tolerancia']:g}" if r else f"E = {self.estado.tolerancia}"),
+             (f"{self.NOMBRES_ERROR[r['criterio']]} {'<' if r['convergio'] else '≥'} E = {r['tolerancia']:g}") if r else f"E = {self.estado.tolerancia}"),
         ]
         self.tarjeta_raiz = None
         with caja("kpis escalonado"):
@@ -254,19 +298,25 @@ class VistaBiseccion:
             return
         e.limpiar_resultados(tambien_grafica=False)
         e.resultado = resultado
-        e.grafica_escalera = await run.io_bound(graficas.grafica_iteraciones, f, resultado)
+        e.grafica_escalera = await run.io_bound(self.grafica_resumen, f, resultado)
         e.grafica_error = await run.io_bound(graficas.grafica_error, resultado)
         if e.tabulacion:
-            e.grafica_general = await run.io_bound(graficas.grafica_funcion, f, e.tabulacion, e.intervalo_activo, resultado["raiz"])
+            raiz = resultado["raiz"] if resultado["convergio"] or "a_inicial" in resultado else None
+            e.grafica_general = await run.io_bound(graficas.grafica_funcion, f, e.tabulacion, e.intervalo_activo, raiz)
         await self.cargar_grafica_iteracion(1)
         self.kpi_recien_calculado = True
         self.refrescar()
         self.ir_a(4)
         # Se remarca el resultado mas importante (con una pausa para que la tarjeta ya este dibujada)
+        titulo = "Raíz encontrada"
         mensaje = (f"Después de {resultado['total_iteraciones']} iteraciones la raíz aproximada es "
                    f"{numero(resultado['raiz'], e.decimales)}. Abajo se explica cada iteración.")
+        veredicto = resultado.get("veredicto")
+        if veredicto and veredicto["tipo"] != "converge":
+            titulo = "El método " + ("diverge" if veredicto["tipo"] == "diverge" else "no alcanzó E")
+            mensaje = f"{veredicto['explicacion']} Abajo se explica cada iteración."
         with self.anclaje:
-            ui.timer(0.6, lambda: guia.resaltar(self.tarjeta_raiz, "Raíz encontrada", mensaje), once=True)
+            ui.timer(0.6, lambda: guia.resaltar(self.tarjeta_raiz, titulo, mensaje), once=True)
 
     async def cargar_grafica_iteracion(self, k):
         e = self.estado
