@@ -18,12 +18,14 @@ RECURSOS = CARPETA / "recursos"
 #   MathLive  -> editor para escribir la funcion como en el cuaderno
 #   driver.js -> guia que resalta paso a paso las partes importantes
 #   plano.js  -> grafica interactiva de f(x) con zoom y paneo (hecha para este programa)
+#   teclado.js -> teclado de funciones (sen, cos, ln, √...) que escribe en el editor o en el texto
 app.add_static_files("/recursos", RECURSOS)
 LIBRERIAS = """
 <link rel="stylesheet" href="/recursos/driver/driver.css">
 <script src="/recursos/driver/driver.js.iife.js"></script>
 <script src="/recursos/mathlive/mathlive.min.js"></script>
 <script src="/recursos/plano/plano.js"></script>
+<script src="/recursos/teclado/teclado.js"></script>
 <script>
   // Se configura cuando ya existe el documento (MathLive lo necesita) y antes de crear los editores
   document.addEventListener('DOMContentLoaded', function () {

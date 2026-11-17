@@ -10,6 +10,7 @@
 # subintervalos donde f cambia de signo, porque si f(a)·f(b) < 0 hay al menos
 # una raiz en (a, b) (teorema de Bolzano).
 import math
+import re
 
 # El error absoluto va primero: es el criterio que se usa por defecto
 CRITERIOS = {
@@ -29,14 +30,43 @@ def _signo(valor):
 
 
 def leer_numero(dato, nombre):
-    """Convierte el texto escrito por el usuario en numero (acepta coma decimal)."""
+    """Convierte el texto escrito por el usuario en numero (acepta coma decimal).
+    Tambien acepta una expresion sin x, como en el cuaderno: pi/2, 10^-4, sqrt(2), e^-1, 1/3."""
+    texto = str(dato if dato is not None else "").strip()
+    if not texto:
+        raise ValueError(f"Falta escribir '{nombre}'.")
     try:
-        valor = float(str(dato).replace(",", ".").strip())
-    except (TypeError, ValueError):
-        raise ValueError(f"'{nombre}' debe ser un número (se escribió '{dato}').")
+        valor = float(texto.replace(",", "."))
+    except ValueError:
+        valor = _leer_expresion(texto, nombre)
     if math.isnan(valor) or math.isinf(valor):
         raise ValueError(f"'{nombre}' debe ser un número finito.")
     return valor
+
+
+def _leer_expresion(texto, nombre):
+    """Valor de una expresion numerica (pi/2, 10^-4...) con el mismo analizador de f(x)."""
+    from .analizador import ErrorFuncion, Funcion   # aqui para no crear una importacion circular
+    try:
+        expresion = Funcion(texto, permitir_ecuacion=False, exigir_x=False)
+    except ErrorFuncion as error:
+        # Con letras sueltas basta decir que va un numero; si solo hay cifras y signos se explica el error (2( …)
+        detalle = "." if re.search(r"[a-zA-Z]", texto) else f": {str(error).rstrip('.')}."
+        raise ValueError(f"'{nombre}' debe ser un número o una expresión como pi/2 (se escribió '{texto}'){detalle}") from None
+    if any(nodo == ("x",) for nodo in _nodos(expresion.arbol)):
+        raise ValueError(f"'{nombre}' debe ser un número: no puede tener x (se escribió '{texto}').")
+    valor = expresion.evaluar(0.0)
+    if valor is None:
+        raise ValueError(f"'{nombre}' no da un número real (se escribió '{texto}').")
+    return valor
+
+
+def _nodos(arbol):
+    """Recorre todos los nodos del arbol de una expresion."""
+    yield arbol
+    for parte in arbol[1:]:
+        if isinstance(parte, tuple):
+            yield from _nodos(parte)
 
 
 def derivada_numerica(f, x):

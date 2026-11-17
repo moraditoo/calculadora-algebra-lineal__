@@ -5,19 +5,24 @@ import re
 
 from nicegui import ui
 
-from ....componentes import aviso, boton, caja, campo, html, segmentado, subtitulo
+from ....componentes import aviso, boton, caja, campo, html, segmentado, subtitulo, teclado
 from ....formato import escapar
 
 
 def construir(vista):
     e = vista.estado
-    html('<div class="subtitulo" style="margin-top:0">Paso 1 · Escriba la función f(x)</div>')
+    html('<div class="subtitulo" style="margin-top:0">Paso 1 · Escriba la función f(x) o la ecuación</div>')
     html('<div class="texto-suave">Escríbala tal como en el cuaderno: los exponentes se ven arriba (x⁴), '
-         'las fracciones se arman con <b>/</b> y la raíz con <b>sqrt</b>. Se buscará la raíz de f(x) = 0.</div>')
+         'las fracciones se arman con <b>/</b> y la raíz con <b>sqrt</b>. Se buscará la raíz de f(x) = 0. '
+         'Si el ejercicio trae una <b>ecuación sin igualar a cero</b>, como <span class="mono">sen(x) = −2x + 1</span>, '
+         'escríbala completa con el signo <b>=</b>: el programa pasa todo al lado izquierdo y arma f(x). '
+         'También puede usar el <b>teclado de funciones</b> de abajo; mientras escribe se indica si está bien '
+         'escrita o qué le falta.</div>')
 
     temporizador = {"actual": None}
 
     async def actualizar_vista_previa():
+        vista.refrescar()   # barra de pasos y tarjetas: una sola vez cuando deja de escribir
         await vista.actualizar_formula()
         if not contenedor.is_deleted:  # el usuario pudo cambiar de paso mientras tanto
             vista_previa.refresh()
@@ -27,8 +32,8 @@ def construir(vista):
             return
         # Funcion nueva: se olvida el intervalo anterior y al graficar se busca un rango adecuado
         e.nueva_funcion(valor, e.es_latex)
-        vista.refrescar()
-        # Se espera a que deje de escribir un momento antes de redibujar la vista previa
+        # Se espera a que deje de escribir un momento antes de redibujar (redibujar en cada tecla
+        # satura el navegador cuando se escribe rapido)
         if temporizador["actual"]:
             temporizador["actual"].cancel()
         temporizador["actual"] = ui.timer(0.35, actualizar_vista_previa, once=True)
@@ -44,7 +49,7 @@ def construir(vista):
 
     with caja().style("margin-top:14px") as contenedor:
         with caja("fila").style("justify-content:space-between; align-items:center; margin-bottom:10px"):
-            html('<div class="etiqueta" style="margin:0">f(x) =</div>')
+            html('<div class="etiqueta" style="margin:0">f(x) o ecuación</div>')
             segmentado([("editor", "Editor matemático"), ("texto_simple", "Texto")],
                        lambda: "editor" if e.es_latex else "texto_simple", cambiar_modo)
 
@@ -63,33 +68,53 @@ def construir(vista):
                                          "Escriba la función como en el cuaderno. Para un exponente use ^ (x^4); "
                                          "para exponentes de varias cifras use ^ y luego paréntesis o la flecha →."))
             else:
-                entrada = campo(None, e.funcion, al_escribir, ancho="100%", placeholder="x^4 - 5x^3 + 0.5x^2 - 11x + 10")
+                entrada = campo(None, e.funcion, al_escribir, ancho="100%",
+                                placeholder="x^4 - 5x^3 + 0.5x^2 - 11x + 10   ó   sen(x) = -2x + 1")
                 entrada.mark("texto-funcion")
                 vista.pasos_guia.append((entrada, "Escribir como texto",
-                                         "Use ^ para exponentes: x^4 - 5x^3 + 0.5x^2 - 11x + 10. Acepta 5x (sin *), e^(-x), ln(x), sen(x), |x|."))
+                                         "Use ^ para exponentes: x^4 - 5x^3 + 0.5x^2 - 11x + 10. Acepta 5x (sin *), e^(-x), ln(x), "
+                                         "sen(x), |x| y ecuaciones con '=' como sen(x) = -2x + 1."))
 
-        editor()
+        # El teclado escribe en el campo que esta en su misma zona (editor matematico o texto)
+        with caja().props("data-zona-teclado") as zona:
+            editor()
+            teclado()
+        vista.pasos_guia.append((zona, "Teclado de funciones",
+                                 "Cada tecla escribe donde está el cursor: sen, cos, tan, sus inversas, ln, log, √, |x|, "
+                                 "fracciones y potencias. Funciona en el editor matemático y en el modo texto."))
 
         subtitulo("Así la entiende el programa")
 
         @ui.refreshable
         def vista_previa():
             f = e.funcion_lista()
-            with caja("caja fila").style("min-height:64px; align-items:center; padding:10px 16px") as cuadro:
+            with caja("caja fila").style("min-height:64px; align-items:center; padding:10px 16px; gap:14px") as cuadro:
+                if f is not None and f.ecuacion:
+                    # Ecuacion sin igualar a cero: solo se muestra la f(x) que resulta de pasar todo a un lado
+                    html('<span class="funcion-metodo">Función que usa el método</span>')
                 if f is None:
                     aviso(e.error_funcion or "", "error").style("width:100%")
                 elif e.formula:
                     html(f'<img src="{e.formula}" alt="f(x)">', "formula-img")
                 else:
                     ui.spinner(size="26px", color="grey-7")
+                if f is not None:
+                    html('<span class="estado-escritura bien">✓ Bien escrita</span>').style("margin-left:auto")
+            # Observaciones que no impiden usarla (tan⁻¹ x leida como arctan x, dominio vacio...)
+            for observacion in (f.avisos if f is not None else []):
+                aviso(observacion, "advertencia").style("margin-top:8px")
             vista.pasos_guia.append((cuadro, "Interpretación",
-                                     "Aquí se ve la función exactamente como la va a usar el método. Revise que coincida con la que escribió."))
+                                     "Aquí se ve la función exactamente como la va a usar el método. Si escribió una "
+                                     "ecuación con '=', es la que queda al pasar todos los términos al lado izquierdo."))
 
         vista_previa()
         vista.despues_de_formula()
 
-        aviso("Funciones disponibles: sen, cos, tan, ln (natural), log (base 10), e^x, sqrt, |x| y pi. "
-              "Se puede escribir 5x en lugar de 5·x.", "info").style("margin-top:14px")
+        aviso("Funciones disponibles: sen, cos, tan, sec, csc, cot, sus inversas (arcsen o sen⁻¹, arccos o cos⁻¹, "
+              "arctan o tan⁻¹…), senh, cosh, tanh, sech, csch, coth y sus inversas, ln (natural), log (base 10), "
+              "log2, e^x, sqrt, cbrt, |x| y pi. Se puede escribir 5x en lugar de 5·x, y una ecuación completa con "
+              "'=' (por ejemplo x³ = 2x + 5). Los ángulos van en radianes.",
+              "info").style("margin-top:14px")
 
     ejemplos_resueltos(vista)
 
@@ -116,7 +141,7 @@ def ejemplos_resueltos(vista):
         for ejemplo in vista.EJEMPLOS:
             with caja("opcion ejemplo"):
                 html(f'<div class="opcion-titulo">{escapar(ejemplo["titulo"])}</div>'
-                     f'<div class="ejemplo-funcion mono">f(x) = {escapar(ejemplo["texto"])}</div>'
+                     f'<div class="ejemplo-funcion mono">{escapar(texto_ejemplo(ejemplo))}</div>'
                      f'<div class="opcion-detalle">{escapar(ejemplo["detalle"])}</div>'
                      f'<div class="opcion-extra mono">{vista.resumen_ejemplo(ejemplo)}</div>')
                 with caja("fila").style("gap:6px"):
@@ -125,6 +150,11 @@ def ejemplos_resueltos(vista):
                           icono="play_arrow", principal=True, clases="compacto")
     vista.pasos_guia.append((rejilla, "Ejemplos resueltos",
                              "Graficar carga el ejemplo y muestra sus intervalos; Resolver lo ejecuta y va directo a las iteraciones."))
+
+
+def texto_ejemplo(ejemplo):
+    """Una ecuacion se muestra tal cual (x³ = 2x + 5); una expresion, como f(x) = ..."""
+    return ejemplo["texto"] if "=" in ejemplo["texto"] else f'f(x) = {ejemplo["texto"]}'
 
 
 def texto_a_latex(texto):

@@ -16,6 +16,34 @@ ESTADOS = {
 }
 
 
+def comprobacion_ecuacion(vista, r, d):
+    """Si se escribio una ecuacion (izquierda = derecha), la raiz se sustituye en los dos lados."""
+    f = vista.estado.funcion_lista()
+    if f is None or not f.ecuacion or r["veredicto"]["tipo"] == "diverge":
+        return
+    lados = f.evaluar_lados(r["raiz"])
+    if lados is None:
+        return
+    izquierda, derecha = lados
+    ec = f.ecuacion
+    raiz = numero(r["raiz"], d)
+    with caja("caja").style("margin-top:14px; padding:14px 18px") as bloque:
+        html('<div class="etiqueta" style="margin:0 0 6px">Comprobación en la ecuación original</div>')
+        html(f'<div class="texto-suave">La ecuación era <b class="mono">{escapar(ec["texto"])}</b>. '
+             f'Se sustituye x = <span class="mono">{raiz}</span> en cada lado:</div>')
+        with caja("rejilla tres").style("margin-top:10px"):
+            html(f'<div class="d-etiqueta">Lado izquierdo</div><div class="d-valor mono">{numero(izquierda, d)}</div>'
+                 f'<div class="texto-suave mono" style="font-size:11.5px">{escapar(ec["izquierda"])}</div>', "dato")
+            html(f'<div class="d-etiqueta">Lado derecho</div><div class="d-valor mono">{numero(derecha, d)}</div>'
+                 f'<div class="texto-suave mono" style="font-size:11.5px">{escapar(ec["derecha"])}</div>', "dato")
+            html(f'<div class="d-etiqueta">Diferencia |izq − der|</div>'
+                 f'<div class="d-valor mono">{numero(abs(izquierda - derecha), d)}</div>'
+                 '<div class="texto-suave" style="font-size:11.5px">≈ 0: los dos lados son iguales</div>', "dato fuerte")
+    vista.pasos_guia.append((bloque, "Comprobación en la ecuación",
+                             "Como la ecuación no estaba igualada a cero, se sustituye la raíz en los dos lados: "
+                             "deben dar (casi) el mismo número."))
+
+
 def construir(vista):
     e = vista.estado
     r = e.resultado
@@ -93,6 +121,8 @@ def construir(vista):
         "frase-final")
     frase.style("margin-top:10px")
     vista.pasos_guia.append((frase, "Conclusión", "Raíz aproximada, residuo e iteraciones, como pide el algoritmo."))
+
+    comprobacion_ecuacion(vista, r, d)
 
     # La clase recomienda revisar los DOS criterios aunque el metodo se detenga con uno
     filas = "".join(

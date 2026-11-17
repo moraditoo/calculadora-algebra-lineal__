@@ -2,12 +2,25 @@
 # Ejemplos resueltos de los metodos abiertos (los de la presentacion de clase y otros que
 # muestran cuando el metodo falla). El rango de la grafica se busca solo.
 #   latex -> como se carga en el editor matematico
-#   texto -> como se muestra en la tarjeta
+#   texto -> como se muestra en la tarjeta (si tiene '=' es una ecuacion sin igualar a cero:
+#            el programa pasa todo al lado izquierdo para armar f(x))
 EJEMPLOS_NEWTON = [
     {
         "titulo": "Ejemplo de clase",
         "detalle": "El de la presentación: f'(x) = 3x² − 1, converge en 3 iteraciones",
         "latex": "x^3-x-2", "texto": "x³ − x − 2", "x0": 1.5,
+        "tolerancia": "0.000001", "criterio": "absoluto",
+    },
+    {
+        "titulo": "Ecuación sin igualar a cero",
+        "detalle": "Se pasa todo a un lado → sen(x) + 2x − 1 = 0",
+        "latex": "\\operatorname{sen}\\left(x\\right)=-2x+1", "texto": "sen(x) = −2x + 1", "x0": 0.0,
+        "tolerancia": "0.000001", "criterio": "absoluto",
+    },
+    {
+        "titulo": "Práctica como ecuación",
+        "detalle": "x³ = 2x + 5 se convierte en x³ − 2x − 5 = 0",
+        "latex": "x^3=2x+5", "texto": "x³ = 2x + 5", "x0": 2.0,
         "tolerancia": "0.000001", "criterio": "absoluto",
     },
     {
@@ -65,6 +78,18 @@ EJEMPLOS_SECANTE = [
         "titulo": "Ejemplo de clase",
         "detalle": "El de la presentación: x₀ = 1, x₁ = 2",
         "latex": "x^3-x-2", "texto": "x³ − x − 2", "x0": 1.0, "x1": 2.0,
+        "tolerancia": "0.000001", "criterio": "absoluto",
+    },
+    {
+        "titulo": "Ecuación sin igualar a cero",
+        "detalle": "Se pasa todo a un lado → sen(x) + 2x − 1 = 0",
+        "latex": "\\operatorname{sen}\\left(x\\right)=-2x+1", "texto": "sen(x) = −2x + 1", "x0": 0.0, "x1": 1.0,
+        "tolerancia": "0.000001", "criterio": "absoluto",
+    },
+    {
+        "titulo": "Exponencial como ecuación",
+        "detalle": "eˣ = 3x → eˣ − 3x = 0 (tiene dos raíces)",
+        "latex": "e^{x}=3x", "texto": "eˣ = 3x", "x0": 0.0, "x1": 1.0,
         "tolerancia": "0.000001", "criterio": "absoluto",
     },
     {

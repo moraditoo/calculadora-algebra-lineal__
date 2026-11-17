@@ -109,6 +109,67 @@ def tarjetas_opcion(opciones, obtener_valor, al_cambiar, columnas="tres"):
     return dibujar
 
 
+# Teclado de funciones: (etiqueta, ayuda, LaTeX para el editor matematico, texto para el campo de texto).
+# En el LaTeX, #0 es lo seleccionado (o una casilla vacia) y #@ lo que esta antes del cursor;
+# en el texto, ▮ marca donde queda el cursor. Lo inserta recursos/teclado/teclado.js.
+_F = r"\left(#0\right)"
+TECLAS = [
+    ("Trigonométricas", [
+        ("sen", "seno", r"\operatorname{sen}" + _F, "sen(▮)"), ("cos", "coseno", r"\cos" + _F, "cos(▮)"),
+        ("tan", "tangente", r"\tan" + _F, "tan(▮)"), ("sec", "secante", r"\sec" + _F, "sec(▮)"),
+        ("csc", "cosecante", r"\csc" + _F, "csc(▮)"), ("cot", "cotangente", r"\cot" + _F, "cot(▮)"),
+    ]),
+    ("Inversas", [
+        ("arcsen", "sen⁻¹", r"\operatorname{arcsen}" + _F, "arcsen(▮)"),
+        ("arccos", "cos⁻¹", r"\arccos" + _F, "arccos(▮)"), ("arctan", "tan⁻¹", r"\arctan" + _F, "arctan(▮)"),
+        ("arcsec", "sec⁻¹", r"\operatorname{arcsec}" + _F, "arcsec(▮)"),
+        ("arccsc", "csc⁻¹", r"\operatorname{arccsc}" + _F, "arccsc(▮)"),
+        ("arccot", "cot⁻¹", r"\operatorname{arccot}" + _F, "arccot(▮)"),
+    ]),
+    ("Hiperbólicas", [
+        ("senh", "seno hiperbólico", r"\operatorname{senh}" + _F, "senh(▮)"),
+        ("cosh", "coseno hiperbólico", r"\cosh" + _F, "cosh(▮)"),
+        ("tanh", "tangente hiperbólica", r"\tanh" + _F, "tanh(▮)"),
+        ("arcsenh", "senh⁻¹", r"\operatorname{arcsenh}" + _F, "arcsenh(▮)"),
+        ("arccosh", "cosh⁻¹", r"\operatorname{arccosh}" + _F, "arccosh(▮)"),
+        ("arctanh", "tanh⁻¹", r"\operatorname{arctanh}" + _F, "arctanh(▮)"),
+    ]),
+    ("Exponenciales, logaritmos y raíces", [
+        ("eˣ", "e elevado a", r"e^{#0}", "e^(▮)"), ("ln", "logaritmo natural", r"\ln" + _F, "ln(▮)"),
+        ("log", "logaritmo base 10", r"\log" + _F, "log(▮)"), ("log₂", "logaritmo base 2", r"\log_{2}" + _F, "log2(▮)"),
+        ("√", "raíz cuadrada", r"\sqrt{#0}", "sqrt(▮)"), ("∛", "raíz cúbica", r"\sqrt[3]{#0}", "cbrt(▮)"),
+        ("|x|", "valor absoluto", r"\left|#0\right|", "|▮|"),
+    ]),
+    ("Operaciones", [
+        ("x", "variable", "x", "x"), ("xⁿ", "potencia", r"#@^{#?}", "^(▮)"), ("x²", "al cuadrado", r"#@^2", "^2"),
+        ("a/b", "fracción", r"\frac{#@}{#?}", "/"), ("·", "multiplicar", r"\cdot ", "*"),
+        ("( )", "paréntesis", r"\left(#0\right)", "(▮)"), ("π", "pi", r"\pi ", "pi"), ("e", "número e", "e", "e"),
+        ("=", "igualdad (ecuación)", "=", " = "),
+    ]),
+]
+ACCIONES_TECLADO = [("←", "izquierda", "Mover el cursor a la izquierda"), ("→", "derecha", "Mover el cursor a la derecha"),
+                    ("⌫", "borrar", "Borrar el anterior"), ("Borrar todo", "limpiar", "Vaciar el campo")]
+
+
+def teclado(sin_ecuacion=False, abierto=True):
+    """Teclado de funciones. Escribe en el campo que este en el mismo contenedor con data-zona-teclado."""
+    atributo = escapar   # tambien escapa las comillas
+    grupos = []
+    for titulo, teclas in TECLAS:
+        botones = "".join(
+            f'<button type="button" class="tecla" title="{atributo(ayuda)}" data-latex="{atributo(latex)}" '
+            f'data-texto="{atributo(texto_plano)}">{escapar(etiqueta)}</button>'
+            for etiqueta, ayuda, latex, texto_plano in teclas if not (sin_ecuacion and etiqueta == "="))
+        grupos.append(f'<div class="teclado-grupo"><div class="teclado-titulo">{escapar(titulo)}</div>'
+                      f'<div class="teclas">{botones}</div></div>')
+    acciones = "".join(f'<button type="button" class="tecla accion" title="{atributo(ayuda)}" '
+                       f'data-accion="{accion}">{escapar(etiqueta)}</button>'
+                       for etiqueta, accion, ayuda in ACCIONES_TECLADO)
+    grupos.append(f'<div class="teclado-grupo"><div class="teclado-titulo">Editar</div><div class="teclas">{acciones}</div></div>')
+    return html(f'<details class="teclado"{" open" if abierto else ""}><summary>Teclado de funciones</summary>'
+                f'<div class="teclado-grupos">{"".join(grupos)}</div></details>')
+
+
 # ----------------------------------------------------------------------
 # Mensajes y resultados
 # ----------------------------------------------------------------------

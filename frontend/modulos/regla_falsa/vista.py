@@ -14,7 +14,7 @@ from .pasos import algoritmo, iteraciones, parametros
 
 
 def construir():
-    VistaReglaFalsa()
+    return VistaReglaFalsa()
 
 
 class VistaReglaFalsa(VistaBiseccion):

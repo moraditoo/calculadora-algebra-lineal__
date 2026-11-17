@@ -3,6 +3,7 @@
 # maximo de iteraciones. Se detiene con la primera de dos condiciones: error < E o maximo de iteraciones.
 from nicegui import ui
 
+from backend.metodos_numericos.abiertos import validar_parametros
 from backend.metodos_numericos.biseccion import leer_numero
 from ....componentes import aviso, boton, caja, campo, html, subtitulo, tarjetas_opcion
 from ....formato import con_signo, numero
@@ -16,7 +17,8 @@ def construir(vista):
     html('<div class="subtitulo" style="margin-top:0">Paso 3 · Parámetros del método</div>')
     html('<div class="texto-suave">El valor inicial lo elige <b>usted</b>: escriba ' +
          ("<b>x₀</b> y <b>x₁</b>" if dos else "<b>x₀</b>") +
-         ' mirando la gráfica del paso 2 (o haga clic sobre ella en ese paso). Es un método abierto: no hace falta un '
+         ' mirando la gráfica del paso 2 (o haga clic sobre ella en ese paso); se aceptan números o expresiones como '
+         '<span class="mono">pi/2</span>, <span class="mono">sqrt(2)</span> o <span class="mono">10^-4</span>. Es un método abierto: no hace falta un '
          'intervalo que encierre la raíz, pero conviene empezar cerca de ella; si x₀ está lejos el método puede '
          'divergir o llegar a otra raíz.</div>')
 
@@ -29,6 +31,8 @@ def construir(vista):
         if nombre in ("tolerancia", "criterio"):
             actualizar_decimales()
             vista.tarjetas_resultado.refresh()
+        if nombre in ("tolerancia", "max_iteraciones"):
+            revision.refresh()
 
     with caja("fila").style("margin-top:14px") as campos:
         entradas = {"x0": campo("x₀ (valor inicial)", e.x0, lambda v: cambiar("x0", v), ancho="170px")}
@@ -84,6 +88,11 @@ def construir(vista):
 
     @ui.refreshable
     def revision():
+        # E y el maximo de iteraciones se revisan mientras se escriben (no solo al ejecutar)
+        try:
+            validar_parametros(e.tolerancia, e.criterio, e.max_iteraciones)
+        except ValueError as error:
+            aviso(str(error), "error").style("margin-top:14px")
         caja_revision = revisar(vista)
         if caja_revision is not None:
             caja_revision.style("margin-top:14px")

@@ -5,8 +5,8 @@ from ....componentes import caja, html
 from ...biseccion.pasos.algoritmo import dibujar
 
 PASOS_NEWTON = [
-    ("Definir f(x) y f'(x)", "Se escribe f(x); el programa calcula <b>f'(x)</b> con las reglas de derivación "
-                             "(o se escribe la que da el profesor)."),
+    ("Definir f(x) y f'(x)", "Se escribe f(x) (si la ecuación no está igualada a cero se pasa todo al lado izquierdo); "
+                             "el programa calcula <b>f'(x)</b> con las reglas de derivación (o se escribe a mano)."),
     ("Elegir x₀", "Un valor inicial cerca de la raíz (la gráfica ayuda a ubicarlo)."),
     ("Calcular xₙ₊₁", "<b>xₙ₊₁ = xₙ − f(xₙ) / f'(xₙ)</b>: la tangente en (xₙ, f(xₙ)) corta el eje x en xₙ₊₁. "
                       "La derivada no debe ser cero ni demasiado pequeña."),
@@ -16,7 +16,8 @@ PASOS_NEWTON = [
 ]
 
 PASOS_SECANTE = [
-    ("Definir f(x) y elegir x₀, x₁", "Dos valores iniciales distintos; no hace falta que encierren la raíz."),
+    ("Definir f(x) y elegir x₀, x₁", "f(x) es la ecuación igualada a cero (todo al lado izquierdo). Dos valores "
+                                     "iniciales distintos; no hace falta que encierren la raíz."),
     ("Calcular f(x₀) y f(x₁)", "Son los dos puntos de la curva por donde pasa la recta secante."),
     ("Calcular x₂", "<b>xₙ₊₁ = xₙ − f(xₙ)·(xₙ − xₙ₋₁) / [f(xₙ) − f(xₙ₋₁)]</b>: donde la secante corta el eje x. "
                     "El denominador debe ser distinto de cero."),
@@ -26,6 +27,9 @@ PASOS_SECANTE = [
 ]
 
 REGLAS = [
+    ("Ecuaciones sin igualar a cero", "Si se escribe izquierda = derecha (sen(x) = −2x + 1), se pasa todo al lado "
+     "izquierdo, se reducen los términos semejantes y se muestra cada paso; en la conclusión la raíz se sustituye "
+     "en los dos lados de la ecuación original."),
     ("Rutina de graficación", "El paso 2 grafica f(x) y marca dónde cambia de signo para elegir buenos valores iniciales."),
     ("Derivada automática", "f'(x) se obtiene del árbol de la función con las reglas de derivación y se muestra en "
      "los pasos 1, 4 y 5; si se escribe a mano se compara con la calculada."),

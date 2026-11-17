@@ -18,11 +18,11 @@ from .pasos import algoritmo, conclusion, derivada, eleccion, iteraciones, param
 
 
 def construir_newton():
-    VistaNewton()
+    return VistaNewton()
 
 
 def construir_secante():
-    VistaSecante()
+    return VistaSecante()
 
 
 class VistaAbierta(VistaBiseccion):
@@ -115,6 +115,10 @@ class VistaAbierta(VistaBiseccion):
         self._usar_intervalo(intervalo)
         await self._redibujar_grafica()
 
+    async def preparar_intervalo(self, intervalo):
+        """Desde la pantalla principal: se marca el tramo de la raiz y se propone su valor inicial."""
+        await self.aplicar_recomendacion(intervalo)
+
     async def aplicar_recomendacion(self, intervalo):
         """El usuario pidio usar el valor recomendado para ese intervalo."""
         self._usar_intervalo(intervalo, forzar=True)
@@ -185,7 +189,7 @@ class VistaNewton(VistaAbierta):
     NOMBRE = "Newton-Raphson"
     TITULO = "Método de Newton-Raphson"
     DESCRIPCION = ("Método abierto: desde un valor inicial x₀ se traza la recta tangente a la curva; donde corta el eje x "
-                   "está la siguiente aproximación. La derivada f'(x) se calcula sola (o la escribe el profesor).")
+                   "está la siguiente aproximación. La derivada f'(x) se calcula sola (o se puede escribir).")
     ICONO = "trending_up"
     PREFIJO = "newton"
     EJEMPLOS = EJEMPLOS_NEWTON

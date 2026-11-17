@@ -21,16 +21,21 @@
   --sombra: 0 14px 36px -16px rgba(0, 0, 0, 0.28), 0 3px 10px -4px rgba(0, 0, 0, 0.1);
 }
 
+/* Cascadia Code y Consolas no tienen los superindices ⁴ ⁵ ⁶… (se veian como x*): solo esos
+   caracteres se toman de una fuente que si los trae, el resto del texto no cambia */
+@font-face { font-family: 'Superindices'; src: local('Cambria Math'), local('Segoe UI'), local('Arial');
+  unicode-range: U+00B2-00B3, U+00B9, U+02E3, U+2070-209F, U+221A-221B; }
+
 html, body { margin: 0; min-height: 100%; }
 body {
-  font-family: 'Inter', 'SF Pro Display', -apple-system, 'Segoe UI Variable Display', 'Segoe UI', Roboto, sans-serif;
+  font-family: 'Superindices', 'Inter', 'SF Pro Display', -apple-system, 'Segoe UI Variable Display', 'Segoe UI', Roboto, sans-serif;
   color: var(--texto);
   background: linear-gradient(160deg, #f4f4f6 0%, #e4e6ea 45%, #d3d7de 100%) fixed;
   -webkit-font-smoothing: antialiased;
 }
 .nicegui-content { padding: 0 !important; gap: 0 !important; }
 ::selection { background: rgba(0, 0, 0, 0.12); }
-.mono { font-family: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace; font-variant-numeric: tabular-nums; }
+.mono { font-family: 'Superindices', 'JetBrains Mono', 'Cascadia Code', Consolas, monospace; font-variant-numeric: tabular-nums; }
 
 /* ---------- Fondo: formas grises que se mueven despacio ---------- */
 .fondo { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
@@ -107,7 +112,6 @@ h1, h2, h3 { line-height: 1.25 !important; }
   box-shadow: var(--borde-luz), 0 8px 18px -10px rgba(0, 0, 0, 0.3);
 }
 .item-menu.activo .q-icon { transform: scale(1.1); }
-.item-menu .nuevo { margin-left: auto; font-size: 9px; font-weight: 800; padding: 2px 7px; border-radius: 99px; color: var(--texto-2); border: 1px solid rgba(0, 0, 0, 0.12); }
 
 .contenido { flex: 1; min-width: 0; overflow-y: auto; padding: 2px 6px 40px; scroll-behavior: smooth; }
 .contenido::-webkit-scrollbar, .desplazable::-webkit-scrollbar { width: 8px; height: 8px; }
@@ -170,9 +174,9 @@ h1, h2, h3 { line-height: 1.25 !important; }
   background: rgba(255, 255, 255, 0.75); box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.05), 0 0 0 3px rgba(0, 0, 0, 0.08);
 }
 .campo input, .campo textarea { color: var(--texto) !important; font-weight: 600; font-size: 14px; }
-.campo.mono input, .campo.mono textarea { font-family: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace; }
+.campo.mono input, .campo.mono textarea { font-family: 'Superindices', 'JetBrains Mono', 'Cascadia Code', Consolas, monospace; }
 .campo.celda-entrada .q-field__control { min-height: 36px; padding: 0 6px; border-radius: 12px; }
-.campo.celda-entrada input { text-align: center; font-family: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace; font-size: 13px; }
+.campo.celda-entrada input { text-align: center; font-family: 'Superindices', 'JetBrains Mono', 'Cascadia Code', Consolas, monospace; font-size: 13px; }
 .campo.destacada .q-field__control { background: rgba(255, 255, 255, 0.75); border: 1.5px solid rgba(0, 0, 0, 0.25); }
 .campo.destacada input { font-weight: 800; }
 .campo.q-textarea .q-field__control { padding: 8px 14px; }
@@ -189,6 +193,35 @@ math-field {
 math-field:focus-within { outline: none; background: rgba(255, 255, 255, 0.8); box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.05), 0 0 0 3px rgba(0, 0, 0, 0.08); }
 math-field::part(menu-toggle) { display: none; }
 math-field::part(virtual-keyboard-toggle) { color: var(--texto-2); }
+
+/* Teclado de funciones (sen, cos, ln, √...): escribe en el editor o en el campo de texto */
+.teclado { margin-top: 10px; }
+.teclado > summary {
+  cursor: pointer; list-style: none; display: inline-flex; align-items: center; gap: 6px; user-select: none;
+  font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--texto-2);
+}
+.teclado > summary::-webkit-details-marker { display: none; }
+.teclado > summary::before { content: '⌨'; font-size: 15px; letter-spacing: 0; }
+.teclado > summary::after { content: '▾'; transition: transform 0.25s; }
+.teclado:not([open]) > summary::after { transform: rotate(-90deg); }
+.teclado-grupos { display: flex; flex-wrap: wrap; gap: 10px 18px; margin-top: 10px; }
+.teclado-grupo { display: flex; flex-direction: column; gap: 5px; }
+.teclado-titulo { font-size: 10px; font-weight: 700; color: var(--texto-2); letter-spacing: 0.04em; }
+.teclas { display: flex; flex-wrap: wrap; gap: 5px; }
+.tecla {
+  min-width: 38px; height: 32px; padding: 0 10px; border-radius: 11px; cursor: pointer;
+  font: 600 13px 'Superindices', 'Segoe UI', Inter, system-ui, sans-serif; color: var(--texto);
+  background: radial-gradient(120% 100% at 20% 0%, #ffffff, rgba(255, 255, 255, 0.65));
+  border: 1px solid rgba(0, 0, 0, 0.08); box-shadow: 0 3px 8px -6px rgba(0, 0, 0, 0.45);
+  transition: transform 0.2s var(--rebote), box-shadow 0.2s;
+}
+.tecla:hover { transform: translateY(-1px); box-shadow: 0 6px 12px -8px rgba(0, 0, 0, 0.5); }
+.tecla:active { transform: scale(0.94); }
+.tecla.accion { background: rgba(255, 255, 255, 0.35); color: var(--texto-2); font-family: inherit; font-size: 12px; }
+
+/* Estado de lo escrito: bien escrito / falta algo */
+.estado-escritura { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 700; padding: 3px 10px; border-radius: 99px; }
+.estado-escritura.bien { color: var(--positivo); background: rgba(46, 125, 91, 0.09); border: 1px solid rgba(46, 125, 91, 0.25); }
 
 /* ---------- Selecciones ---------- */
 .segmentado {
@@ -335,54 +368,200 @@ details.desplegable > div { padding: 0 15px 15px; }
 .controles-zoom .material-icons { font-size: 18px; }
 
 /* ---------- Pantalla principal ---------- */
-.inicio-hero { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 20px; align-items: center; padding: 34px 36px; }
-.hero-texto h1 { margin: 14px 0 12px; font-size: 38px; line-height: 1.08; font-weight: 800; letter-spacing: -0.03em; color: var(--texto); }
-.hero-texto p { margin: 0; max-width: 470px; font-size: 15px; line-height: 1.6; color: var(--texto-2); }
-.hero-ilustracion svg { display: block; width: 100%; height: auto; }
-.hero-ilustracion .ejes line { stroke: var(--oscuro); stroke-width: 1.3; opacity: 0.55; }
-.hero-ilustracion .rejilla-ilustracion line { stroke: rgba(60, 60, 67, 0.09); stroke-width: 1; }
-.hero-ilustracion .curva { fill: none; stroke: url(#inicio-curva); stroke-width: 3.2; stroke-linecap: round;
-  stroke-dasharray: 520; stroke-dashoffset: 520; animation: trazar 1.6s var(--curva) 0.2s forwards; }
-.hero-ilustracion .secante { stroke: var(--oscuro); stroke-width: 1.5; stroke-dasharray: 6 4; opacity: 0; animation: secante 7.5s ease-in-out infinite; }
-.hero-ilustracion .s2 { animation-delay: 1.2s; } .hero-ilustracion .s3 { animation-delay: 2.4s; }
-.hero-ilustracion .paso { fill: var(--oscuro); stroke: #fff; stroke-width: 1.5; opacity: 0; animation: secante 7.5s ease-in-out infinite; }
-.hero-ilustracion .p1 { animation-delay: 0.5s; } .hero-ilustracion .p2 { animation-delay: 1.7s; } .hero-ilustracion .p3 { animation-delay: 2.9s; }
-.hero-ilustracion .extremo { fill: var(--positivo); stroke: #fff; stroke-width: 1.5; }
-.hero-ilustracion .raiz { fill: var(--texto); stroke: #fff; stroke-width: 2; }
-.hero-ilustracion .raiz-halo { fill: rgba(29, 29, 31, 0.12); transform-origin: 214.7px 150px; animation: latido 2.4s ease-in-out infinite; }
-.hero-ilustracion text { font: 700 12px Inter, 'Segoe UI', sans-serif; fill: var(--texto-2); }
-@keyframes trazar { to { stroke-dashoffset: 0; } }
-@keyframes secante { 0%, 8% { opacity: 0; } 18%, 70% { opacity: 0.85; } 85%, 100% { opacity: 0; } }
-@keyframes latido { 0%, 100% { transform: scale(1); opacity: 0.9; } 50% { transform: scale(1.5); opacity: 0.3; } }
-/* Si el sistema pide menos movimiento, el dibujo se muestra completo y quieto */
-@media (prefers-reduced-motion: reduce) {
-  .hero-ilustracion .curva { animation: none; stroke-dashoffset: 0; }
-  .hero-ilustracion .secante, .hero-ilustracion .paso { animation: none; opacity: 0.85; }
-  .hero-ilustracion .raiz-halo { animation: none; }
-}
+.inicio-rapido { padding: 30px 32px 26px; }
+.rapido-rejilla { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); gap: 26px; align-items: start; }
+.rapido-izquierda { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.rapido-izquierda h1 { margin: 2px 0 0; font-size: 36px; line-height: 1.06 !important; font-weight: 800; letter-spacing: -0.035em; }
+.rapido-izquierda h1 .atenuado { color: var(--texto-3); }
+.rapido-intro { margin: 0; font-size: 14px; line-height: 1.6; color: var(--texto-2); max-width: 470px; }
+.rapido-intro b { color: var(--texto); }
+.rapido-derecha { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 
-.cifras-inicio { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
-.cifra-caja { padding: 16px 18px; border-radius: 24px; text-align: center; }
-.cifra { font-size: 30px; font-weight: 800; letter-spacing: -0.02em; }
-.cifra-texto { font-size: 12px; font-weight: 600; color: var(--texto-2); }
-.modulo-inicio { display: flex; flex-direction: column; gap: 6px; min-height: 150px; }
+/* Campo grande donde se escribe la ecuacion */
+.entrada-heroe {
+  display: flex; align-items: center; gap: 10px; padding: 6px 8px 6px 16px; border-radius: 22px;
+  background: rgba(255, 255, 255, 0.72); border: 1px solid rgba(255, 255, 255, 0.95);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.06), 0 14px 30px -20px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(0, 0, 0, 0.05);
+  transition: box-shadow 0.25s, background 0.25s;
+}
+.entrada-heroe:focus-within { background: #ffffff; box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.04), 0 0 0 3px rgba(29, 29, 31, 0.14), 0 16px 34px -20px rgba(0, 0, 0, 0.5); }
+.entrada-heroe .entrada-icono .material-icons { font-size: 21px; color: var(--texto-3); }
+.campo-heroe { flex: 1; min-width: 0; }
+.campo-heroe .q-field__control { min-height: 50px; padding: 0; background: transparent; }
+.campo-heroe input { font-size: 21px !important; font-weight: 700; color: var(--texto) !important; letter-spacing: -0.01em; }
+
+.muestras { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.muestras-titulo { font-size: 11px; font-weight: 800; color: var(--texto-3); text-transform: uppercase; letter-spacing: 0.1em; margin-right: 2px; }
+.muestra {
+  padding: 5px 11px; border-radius: 99px; font-size: 12px; font-weight: 700; cursor: pointer; color: var(--texto-2);
+  background: rgba(255, 255, 255, 0.45); border: 1px solid rgba(255, 255, 255, 0.85);
+  box-shadow: inset 1px 1px 0 rgba(255, 255, 255, 0.9), 0 3px 8px -6px rgba(0, 0, 0, 0.35);
+  transition: transform 0.35s var(--rebote), background 0.25s, color 0.25s;
+}
+.muestra:hover { transform: translateY(-2px); background: #ffffff; color: var(--texto); }
+
+.interpretacion { padding: 14px 16px; border-radius: 20px; background: rgba(255, 255, 255, 0.35); border: 1px solid rgba(255, 255, 255, 0.7);
+  box-shadow: inset 1px 1px 0 rgba(255, 255, 255, 0.9); animation: subir 0.45s var(--curva) both; }
+.interpretacion .aviso { background: transparent; border: 0; box-shadow: none; padding: 0; }
+.formula-resultado { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
+.formula-resultado .formula-img img { max-height: 40px; }
+.igual-cero { font-size: 13px; font-weight: 800; color: var(--texto-3); }
+
+.plano.plano-inicio { height: 330px; }
+.plano-vacio-caja { height: 330px; border-radius: 22px; display: grid; place-items: center; text-align: center;
+  background: rgba(255, 255, 255, 0.3); border: 1px dashed rgba(0, 0, 0, 0.12); color: var(--texto-3); font-size: 13px; font-weight: 600; }
+.plano-vacio .material-icons { font-size: 34px; }
+.raices-rapidas { display: flex; flex-direction: column; gap: 8px; }
+.chip-raiz {
+  display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 99px; cursor: pointer;
+  font-size: 12.5px; font-weight: 700; color: var(--texto-2);
+  background: rgba(255, 255, 255, 0.4); border: 1px solid rgba(255, 255, 255, 0.85);
+  transition: transform 0.35s var(--rebote), background 0.25s;
+}
+.chip-raiz:hover { transform: translateY(-2px); background: rgba(255, 255, 255, 0.85); }
+.chip-raiz .r-nombre { font-size: 10px; font-weight: 800; color: var(--texto-3); }
+.chip-raiz.activa { color: #ffffff; background: var(--texto); border-color: var(--texto); box-shadow: 0 8px 18px -10px rgba(0, 0, 0, 0.6); }
+.chip-raiz.activa .r-nombre { color: rgba(255, 255, 255, 0.6); }
+
+/* Botones grandes para abrir un metodo con la funcion escrita */
+.acciones-rapidas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.accion {
+  display: flex; align-items: center; gap: 11px; padding: 12px 14px; border-radius: 20px; cursor: pointer; min-width: 0;
+  background: radial-gradient(120% 90% at 15% 0%, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.45));
+  border: 1px solid rgba(255, 255, 255, 0.9); color: var(--texto);
+  box-shadow: var(--borde-luz), 0 10px 22px -16px rgba(0, 0, 0, 0.45);
+  transition: transform 0.45s var(--rebote), box-shadow 0.3s, background 0.3s;
+}
+.accion:hover { transform: translateY(-3px); box-shadow: var(--borde-luz), 0 18px 30px -18px rgba(0, 0, 0, 0.55); }
+.accion:active { transform: scale(0.98); }
+.accion.abierto { background: linear-gradient(160deg, #2c2c2e, #111113); border-color: #000; color: #ffffff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 14px 26px -14px rgba(0, 0, 0, 0.65); }
+.accion.abierto:hover { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 20px 34px -16px rgba(0, 0, 0, 0.7); }
+.accion-icono { width: 36px; height: 36px; flex-shrink: 0; display: grid; place-items: center; border-radius: 12px;
+  background: rgba(255, 255, 255, 0.85); box-shadow: inset 1px 1px 0 #fff, 0 4px 10px -6px rgba(0, 0, 0, 0.35); }
+.accion.abierto .accion-icono { background: rgba(255, 255, 255, 0.12); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14); }
+.accion-icono .material-icons { font-size: 19px; }
+.accion-texto { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.accion-nombre { font-size: 13px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.accion-pista { font-size: 11px; font-weight: 600; opacity: 0.62; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
+.accion-flecha { font-size: 18px !important; opacity: 0.5; transition: transform 0.4s var(--rebote), opacity 0.3s; }
+.accion:hover .accion-flecha { transform: translateX(3px); opacity: 1; }
+.accion.cargando .accion-flecha { animation: girar 0.9s linear infinite; opacity: 1; }
+.accion.deshabilitada { opacity: 0.45; pointer-events: none; }
+@keyframes girar { to { transform: rotate(360deg); } }
+
+/* Secciones */
+.seccion-cabeza { display: flex; justify-content: space-between; align-items: flex-end; gap: 18px; flex-wrap: wrap; margin-bottom: 16px; }
+.seccion-titulo { margin: 6px 0 12px; font-size: 21px; font-weight: 800; letter-spacing: -0.02em; }
+.seccion-cabeza .seccion-titulo { margin-bottom: 0; }
+.seccion-nota { max-width: 420px; font-size: 12.5px; }
+
+/* Tarjetas de Newton-Raphson y secante con su ilustracion */
+.metodo-destacado { padding: 0; overflow: hidden; display: flex; flex-direction: column; border-radius: 24px; }
+.metodo-ilustracion { padding: 14px 16px 6px; border-bottom: 1px solid rgba(255, 255, 255, 0.7);
+  background: radial-gradient(120% 100% at 20% 0%, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.25)); }
+.metodo-ilustracion svg { display: block; width: 100%; height: auto; max-height: 170px; }
+.metodo-ilustracion .eje { stroke: var(--oscuro); stroke-width: 1.2; opacity: 0.45; }
+.metodo-ilustracion .curva { fill: none; stroke: var(--texto); stroke-width: 2.6; stroke-linecap: round; }
+.metodo-ilustracion .recta { stroke: var(--oscuro); stroke-width: 1.5; stroke-dasharray: 5 4; opacity: 0; animation: aparecer-paso 6s ease-in-out infinite; }
+.metodo-ilustracion .guia { stroke: var(--texto-3); stroke-width: 1; stroke-dasharray: 2 3; opacity: 0; animation: aparecer-paso 6s ease-in-out infinite; }
+.metodo-ilustracion .punto { fill: var(--positivo); stroke: #fff; stroke-width: 1.5; opacity: 0; animation: aparecer-paso 6s ease-in-out infinite; }
+.metodo-ilustracion .corte { fill: var(--oscuro); stroke: #fff; stroke-width: 1.3; opacity: 0; animation: aparecer-paso 6s ease-in-out infinite; }
+.metodo-ilustracion .r2, .metodo-ilustracion .q2 { animation-delay: 1.4s; }
+.metodo-ilustracion .raiz-ilustracion { fill: var(--texto); stroke: #fff; stroke-width: 2; }
+@keyframes aparecer-paso { 0%, 6% { opacity: 0; } 16%, 72% { opacity: 0.9; } 88%, 100% { opacity: 0; } }
+.metodo-cuerpo { padding: 14px 18px 16px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
+.metodo-nombre { font-size: 17px; font-weight: 800; letter-spacing: -0.015em; }
+.metodo-formula { margin-top: 4px; padding: 9px 12px; border-radius: 14px; font-size: 12.5px; font-weight: 700; overflow-x: auto; white-space: nowrap;
+  background: rgba(255, 255, 255, 0.6); border: 1px solid rgba(255, 255, 255, 0.95); box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.05); }
+.metodo-formula.pequena { font-size: 11.5px; padding: 6px 10px; margin-top: 8px; display: inline-block; }
+.etiquetas-metodo { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
+.etiqueta-metodo { font-size: 10.5px; font-weight: 800; padding: 3px 9px; border-radius: 99px; color: var(--texto-2); border: 1px solid rgba(0, 0, 0, 0.1); background: rgba(255, 255, 255, 0.55); }
+.metodo-cuerpo .modulo-abrir { margin-top: 8px; }
+.metodo-destacado:hover .modulo-abrir .material-icons, .herramienta:hover .modulo-abrir .material-icons { transform: translateX(4px); }
+
+.metodo-cerrado { display: flex; gap: 14px; align-items: flex-start; }
+.cerrado-texto { flex: 1; min-width: 0; }
+.cerrado-flecha { font-size: 18px; color: var(--texto-3); transition: transform 0.4s var(--rebote), color 0.3s; margin-top: 10px; }
+.metodo-cerrado:hover .cerrado-flecha { transform: translateX(4px); color: var(--texto); }
+
 .modulo-cabeza { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
-.modulo-icono { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 14px;
+.modulo-icono { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 14px; flex-shrink: 0;
   background: rgba(255, 255, 255, 0.75); border: 1px solid rgba(255, 255, 255, 0.9); box-shadow: inset 1px 1px 0 #fff, 0 6px 14px -10px rgba(0, 0, 0, 0.4); }
 .modulo-icono .material-icons { font-size: 21px; color: var(--texto); }
-.modulo-abrir { margin-top: auto; display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 800; color: var(--texto); }
+.modulo-abrir { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 800; color: var(--texto); }
 .modulo-abrir .material-icons { font-size: 16px; transition: transform 0.4s var(--rebote); }
-.modulo-inicio:hover .modulo-abrir .material-icons { transform: translateX(4px); }
-.paso-inicio { display: flex; flex-direction: column; gap: 8px; padding: 14px 15px; border-radius: 20px;
-  background: rgba(255, 255, 255, 0.3); border: 1px solid rgba(255, 255, 255, 0.6); box-shadow: inset 1px 1px 0 rgba(255, 255, 255, 0.9); }
-.paso-inicio .que { font-weight: 800; font-size: 13.5px; }
-.paso-inicio .como { font-size: 12.5px; color: var(--texto-2); line-height: 1.5; }
-.icono-paso { color: var(--texto-2); }
-@media (max-width: 900px) {
-  .inicio-hero { grid-template-columns: minmax(0, 1fr); padding: 26px 22px; }
-  .hero-texto h1 { font-size: 30px; }
-  .cifras-inicio { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+/* Tabla Newton-Raphson vs secante */
+.contenedor-comparacion { overflow-x: auto; border-radius: 20px; background: rgba(255, 255, 255, 0.3); border: 1px solid rgba(255, 255, 255, 0.7); }
+.tabla-comparacion { width: 100%; border-collapse: collapse; font-size: 13px; }
+.tabla-comparacion th, .tabla-comparacion td { padding: 11px 16px; text-align: left; vertical-align: top; border-bottom: 1px solid rgba(0, 0, 0, 0.05); }
+.tabla-comparacion thead th { font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: var(--texto-2); background: rgba(255, 255, 255, 0.55); }
+.tabla-comparacion tbody th { width: 22%; font-weight: 800; color: var(--texto); }
+.tabla-comparacion tbody td { color: var(--texto-2); font-weight: 600; }
+.tabla-comparacion tbody tr:last-child th, .tabla-comparacion tbody tr:last-child td { border-bottom: 0; }
+.tabla-comparacion tr.destacada th, .tabla-comparacion tr.destacada td { background: rgba(255, 255, 255, 0.6); color: var(--texto); }
+.tabla-comparacion tr.destacada th .mono { font-size: 11px; font-weight: 600; color: var(--texto-2); }
+
+/* Otras herramientas */
+.rejilla.herramientas { grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); }
+.herramienta { display: flex; gap: 12px; align-items: flex-start; }
+.herramienta-grupo { font-size: 9.5px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; color: var(--texto-3); margin-bottom: 2px; }
+
+.pie-inicio { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; padding: 4px 0 10px; font-size: 12px; font-weight: 600; color: var(--texto-3); }
+.pie-inicio b { color: var(--texto-2); }
+.tecla { display: inline-block; padding: 1px 7px; border-radius: 7px; font-size: 10.5px; font-weight: 800; color: var(--texto-2);
+  background: rgba(255, 255, 255, 0.75); border: 1px solid rgba(0, 0, 0, 0.1); box-shadow: 0 1px 0 rgba(0, 0, 0, 0.12);
+  font-family: 'Superindices', 'JetBrains Mono', 'Cascadia Code', Consolas, monospace; }
+
+@media (max-width: 1100px) {
+  .rapido-rejilla { grid-template-columns: minmax(0, 1fr); }
 }
+@media (max-width: 600px) {
+  .inicio-rapido { padding: 22px 16px; }
+  .rapido-izquierda h1 { font-size: 28px; }
+  .campo-heroe input { font-size: 17px !important; }
+  .acciones-rapidas { grid-template-columns: minmax(0, 1fr); }
+  .plano.plano-inicio, .plano-vacio-caja { height: 280px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .metodo-ilustracion .recta, .metodo-ilustracion .guia, .metodo-ilustracion .punto, .metodo-ilustracion .corte { animation: none; opacity: 0.85; }
+}
+
+/* ---------- Paso 1: ecuacion escrita con '=' ---------- */
+.funcion-metodo { font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--texto-2);
+  padding: 5px 10px; border-radius: 99px; background: rgba(255, 255, 255, 0.7); box-shadow: var(--borde-luz); white-space: nowrap; }
+
+/* ---------- Barra lateral: buscador y novedades ---------- */
+.buscar-menu { display: flex; align-items: center; gap: 9px; margin: 0 2px 10px; padding: 9px 10px 9px 13px; border-radius: 14px; cursor: pointer;
+  font-size: 12.5px; font-weight: 600; color: var(--texto-3);
+  background: rgba(255, 255, 255, 0.35); border: 1px solid rgba(255, 255, 255, 0.7); box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.05);
+  transition: background 0.25s, color 0.25s; }
+.buscar-menu:hover { background: rgba(255, 255, 255, 0.7); color: var(--texto-2); }
+.buscar-menu .q-icon { font-size: 17px; }
+.buscar-menu .buscar-texto { flex: 1; }
+.item-menu .item-nombre { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.punto-nuevo { width: 7px; height: 7px; border-radius: 99px; background: var(--positivo); box-shadow: 0 0 0 3px rgba(46, 125, 91, 0.15); flex-shrink: 0; }
+.pie-menu { margin-top: auto; padding: 16px 12px 0; font-size: 10.5px; font-weight: 700; color: var(--texto-3); }
+
+/* ---------- Buscador rapido (Ctrl + K) ---------- */
+.q-dialog__inner--minimized { padding: 24px; }
+.buscador { width: min(620px, 92vw); max-height: 70vh; display: flex; flex-direction: column; border-radius: 26px; overflow: hidden;
+  background: rgba(250, 250, 252, 0.9); }
+.buscador-cabeza { display: flex; align-items: center; gap: 10px; padding: 14px 18px; border-bottom: 1px solid rgba(0, 0, 0, 0.06); }
+.buscador-cabeza > .q-icon { font-size: 21px; color: var(--texto-3); }
+.buscador-entrada { flex: 1; }
+.buscador-entrada input { font-size: 17px !important; font-weight: 600; color: var(--texto) !important; }
+.buscador-lista { overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 2px; }
+.buscador-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 16px; cursor: pointer; transition: background 0.2s; }
+.buscador-item:hover, .buscador-item.primero { background: rgba(255, 255, 255, 0.95); box-shadow: 0 4px 12px -8px rgba(0, 0, 0, 0.3); }
+.buscador-icono .material-icons { font-size: 20px; color: var(--texto); }
+.buscador-icono { width: 34px; height: 34px; border-radius: 11px; display: grid; place-items: center; background: rgba(255, 255, 255, 0.8); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.06); flex-shrink: 0; }
+.buscador-nombre { font-size: 13.5px; font-weight: 800; }
+.buscador-detalle { font-size: 11.5px; color: var(--texto-2); }
+.buscador-item > div:nth-child(2) { flex: 1; min-width: 0; }
+.buscador-grupo { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: var(--texto-3); white-space: nowrap; }
+.buscador-pie { padding: 10px 18px; border-top: 1px solid rgba(0, 0, 0, 0.06); font-size: 11px; font-weight: 600; color: var(--texto-3); }
 
 /* Control de decimales: − 5 + Auto */
 .control-decimales { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 5px 10px 5px 14px; border-radius: 999px;
@@ -474,7 +653,7 @@ details.desplegable > div { padding: 0 15px 15px; }
 @media (max-width: 900px) {
   .marco { flex-direction: column; height: auto; width: calc(100vw - 20px); margin: 10px auto; }
   .lateral { width: auto; flex-direction: row; overflow-x: auto; padding: 10px; border-radius: 24px; }
-  .marca, .grupo-menu { display: none; }
+  .marca, .grupo-menu, .buscar-menu, .pie-menu { display: none; }
   .item-menu { flex-shrink: 0; }
   .contenido { overflow: visible; padding: 0 0 30px; }
   .rejilla.tres, .rejilla.cuatro, .rejilla.cinco { grid-template-columns: repeat(2, minmax(0, 1fr)); }

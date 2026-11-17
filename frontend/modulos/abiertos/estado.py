@@ -29,7 +29,7 @@ class EstadoAbierto(Estado):
     x1: str = ""
     siguiente: str = "x0"     # secante: que valor elige el proximo clic sobre la grafica
     max_iteraciones: str = "50"
-    # f'(x): se calcula sola; si el profesor la da, se puede escribir
+    # f'(x): se calcula sola, o se puede escribir a mano
     usar_derivada_escrita: bool = False
     derivada_escrita: str = ""
     formula_derivada: str | None = None
@@ -48,7 +48,9 @@ class EstadoAbierto(Estado):
         texto, objeto, error = self._cache_derivada
         if texto != self.derivada_escrita:
             try:
-                objeto, error = Funcion(self.derivada_escrita, nombre=r"f^{\prime}(x)"), None
+                # La derivada puede ser constante (f'(x) = 3), por eso no se exige que tenga x
+                objeto, error = Funcion(self.derivada_escrita, nombre=r"f^{\prime}(x)", permitir_ecuacion=False,
+                                        exigir_x=False), None
             except ErrorFuncion as e:
                 objeto, error = None, str(e)
             self._cache_derivada = (self.derivada_escrita, objeto, error)

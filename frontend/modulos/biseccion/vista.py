@@ -15,7 +15,7 @@ from .pasos import algoritmo, conclusion, funcion, grafica, iteraciones, paramet
 
 
 def construir():
-    VistaBiseccion()
+    return VistaBiseccion()
 
 
 class VistaBiseccion:
@@ -279,6 +279,36 @@ class VistaBiseccion:
             return
         if await self.graficar():
             await self.resolver()
+
+    async def preparar_intervalo(self, intervalo):
+        """Deja elegido un intervalo al abrir el metodo desde la pantalla principal."""
+        await self.elegir_intervalo(intervalo)
+
+    async def abrir_con_funcion(self, texto, x_cercano=None):
+        """La pantalla principal manda una funcion o una ecuacion escrita como texto: se carga,
+        se grafica y queda elegido el intervalo de la raiz pedida (o el primero). Devuelve True si se pudo."""
+        e = self.estado
+        self.reproductor.deactivate()
+        e.nueva_funcion(texto, False)
+        if e.funcion_lista() is None:
+            ui.notify(e.error_funcion or "La función no es válida.", type="negative", position="top")
+            return False
+        if not await self.graficar():
+            return False
+        intervalos = e.tabulacion["intervalos"]
+        if intervalos:
+            if x_cercano is None:
+                intervalo = next((iv for iv in intervalos if iv["exacta"] is None), intervalos[0])
+            else:
+                intervalo = min(intervalos, key=lambda iv: 0 if iv["a"] <= x_cercano <= iv["b"]
+                                else min(abs(iv["a"] - x_cercano), abs(iv["b"] - x_cercano)))
+            await self.preparar_intervalo(intervalo)
+        await self.actualizar_formula()
+        e.paso = 2
+        self.barra_pasos.refresh()
+        self.tarjetas_resultado.refresh()
+        self.panel.refresh()
+        return True
 
     async def elegir_intervalo(self, intervalo):
         e = self.estado

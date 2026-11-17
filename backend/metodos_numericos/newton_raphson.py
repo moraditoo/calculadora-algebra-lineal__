@@ -1,6 +1,6 @@
 # backend/metodos_numericos/newton_raphson.py
 # Metodo de Newton-Raphson (metodo abierto). Algoritmo de la presentacion:
-#   1) Definir f(x) y f'(x)      (f'(x) se calcula sola con las reglas de derivacion, o la escribe el profesor)
+#   1) Definir f(x) y f'(x)      (f'(x) se calcula sola con las reglas de derivacion, o se escribe a mano)
 #   2) Elegir x0
 #   3) Calcular x(n+1) = x(n) − f(x(n)) / f'(x(n))
 #   4) Evaluar el residuo |f(x(n+1))| y el cambio |x(n+1) − x(n)|

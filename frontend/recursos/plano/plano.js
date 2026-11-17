@@ -17,9 +17,19 @@
   // Funciones auxiliares que usa la expresion traducida (mismo comportamiento que en Python)
   const F = {
     pot: (b, e) => (b === 0 && e < 0 ? NaN : Math.pow(b, e)),  // base negativa con exponente fraccionario -> NaN
+    div: (a, b) => (b === 0 ? NaN : a / b),                    // division entre cero: sin definir
     sec: (v) => 1 / Math.cos(v),
     csc: (v) => 1 / Math.sin(v),
     cot: (v) => 1 / Math.tan(v),
+    asec: (v) => Math.acos(1 / v),
+    acsc: (v) => Math.asin(1 / v),
+    acot: (v) => Math.PI / 2 - Math.atan(v),
+    sech: (v) => 1 / Math.cosh(v),
+    csch: (v) => 1 / Math.sinh(v),
+    coth: (v) => 1 / Math.tanh(v),
+    asech: (v) => (v === 0 ? NaN : Math.acosh(1 / v)),
+    acsch: (v) => (v === 0 ? NaN : Math.asinh(1 / v)),
+    acoth: (v) => (v === 0 ? NaN : Math.atanh(1 / v)),
   };
 
   function compilar(expresion) {

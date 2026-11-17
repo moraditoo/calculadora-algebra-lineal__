@@ -4,6 +4,7 @@ import math
 from dataclasses import dataclass, field
 
 from backend.metodos_numericos.analizador import ErrorFuncion, Funcion
+from backend.metodos_numericos.biseccion import leer_numero
 from .ejemplos import EJEMPLOS
 
 CRITERIOS = [
@@ -84,7 +85,7 @@ class Estado:
         if not self.decimales_automaticos:
             return
         try:
-            precision = float(str(self.tolerancia).replace(",", "."))
+            precision = leer_numero(self.tolerancia, "E")   # acepta 0,0001 y tambien 10^-4
         except ValueError:
             return
         if precision <= 0 or math.isinf(precision) or math.isnan(precision):
