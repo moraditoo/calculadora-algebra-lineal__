@@ -2,6 +2,7 @@
 # Piezas visuales que comparten todos los modulos (tarjetas, botones, campos,
 # matrices, avisos...). Cada modulo solo combina estas piezas.
 import json
+import re
 
 from nicegui import ui
 
@@ -77,12 +78,13 @@ def selector(etiqueta, opciones, valor, al_cambiar, ancho="210px"):
     return s
 
 
-def segmentado(opciones, obtener_valor, al_cambiar):
-    """Control tipo pastilla de iOS. opciones: lista de (valor, texto)."""
+def segmentado(opciones, obtener_valor, al_cambiar, envolver=False):
+    """Control tipo pastilla de iOS. opciones: lista de (valor, texto). Con envolver las
+    opciones pasan a la linea siguiente cuando no caben."""
 
     @ui.refreshable
     def dibujar():
-        with caja("segmentado"):
+        with caja("segmentado" + (" envolver" if envolver else "")):
             for valor, etiqueta in opciones:
                 elemento = html(escapar(etiqueta), "opcion-seg" + (" activa" if valor == obtener_valor() else "")).mark(f"seg-{valor}")
                 elemento.on("click", lambda v=valor: (al_cambiar(v), dibujar.refresh()))
@@ -107,6 +109,124 @@ def tarjetas_opcion(opciones, obtener_valor, al_cambiar, columnas="tres"):
 
     dibujar()
     return dibujar
+
+
+def selector_numero(etiqueta, valor, minimo, maximo, al_cambiar):
+    """Control − n + para tamanos de matrices: cambia al instante, sin boton 'Aplicar'."""
+    estado = {"valor": valor}
+
+    @ui.refreshable
+    def dibujar():
+        with caja("selector-numero"):
+            if etiqueta:
+                html(escapar(etiqueta), "etiqueta")
+            with caja("selector-numero-cuerpo"):
+                menos = boton("", lambda: cambiar(-1), icono="remove", clases="redondo")
+                html(str(estado["valor"]), "selector-numero-valor mono")
+                mas = boton("", lambda: cambiar(1), icono="add", clases="redondo")
+                menos.props(f"{'disable' if estado['valor'] <= minimo else ''}")
+                mas.props(f"{'disable' if estado['valor'] >= maximo else ''}")
+
+    def cambiar(delta):
+        nuevo = max(minimo, min(maximo, estado["valor"] + delta))
+        if nuevo != estado["valor"]:
+            estado["valor"] = nuevo
+            dibujar.refresh()
+            al_cambiar(nuevo)
+
+    dibujar()
+    return dibujar
+
+
+class desplegable:
+    """Seccion plegable (details/summary) que admite cualquier elemento de NiceGUI dentro:
+        with desplegable("Procedimiento").style("margin-top:12px"):
+            ...
+    """
+
+    def __init__(self, titulo, abierto=False, clases=""):
+        self.detalles = ui.element("details").classes("desplegable " + clases)
+        if abierto:
+            self.detalles.props("open")
+        with self.detalles:
+            with ui.element("summary"):
+                html(escapar(titulo), "desplegable-titulo")
+            self.cuerpo = caja("desplegable-cuerpo")
+
+    def style(self, css):
+        self.detalles.style(css)
+        return self
+
+    def __enter__(self):
+        return self.cuerpo.__enter__()
+
+    def __exit__(self, *error):
+        return self.cuerpo.__exit__(*error)
+
+
+# ----------------------------------------------------------------------
+# Formulas (KaTeX), numeros animados (CountUp) y graficas (ECharts).
+# recursos/realce/realce.js las activa en cuanto aparecen en la pagina.
+# ----------------------------------------------------------------------
+def tex_html(latex, bloque=False, clases=""):
+    bloque_attr = ' data-bloque="1"' if bloque else ""
+    return f'<span class="tex {clases}" data-tex="{escapar(latex)}"{bloque_attr}>{escapar(latex)}</span>'
+
+
+def tex(latex, bloque=False, clases=""):
+    return html(tex_html(latex, bloque), clases)
+
+
+def valor_tex(texto, grande=False):
+    """'-101/146' -> fraccion de KaTeX;  '−3' -> -3. Con grande usa dfrac (fraccion a tamano normal)."""
+    limpio = str(texto).replace("−", "-").strip()
+    fraccion = re.fullmatch(r"(-)?(\d+)/(\d+)", limpio)
+    if fraccion:
+        comando = r"\dfrac{" if grande else r"\frac{"
+        return (fraccion[1] or "") + comando + fraccion[2] + "}{" + fraccion[3] + "}"
+    return limpio
+
+
+def matriz_tex(datos, corte=None):
+    """Matriz con corchetes para KaTeX. corte: columna donde va la barra de una matriz aumentada.
+    Si tiene fracciones se dibujan a tamano normal y con mas espacio entre filas."""
+    con_fracciones = any("/" in str(v) for fila in datos for v in fila)
+    filas = " \\\\ ".join(" & ".join(valor_tex(v, con_fracciones) for v in fila) for fila in datos)
+    espacio = r"\def\arraystretch{2.1}" if con_fracciones else ""
+    if corte is None:
+        return "{" + espacio + r"\begin{bmatrix} " + filas + r" \end{bmatrix}}"
+    columnas = "c" * corte + "|" + "c" * (len(datos[0]) - corte)
+    return "{" + espacio + r"\left[\begin{array}{" + columnas + "} " + filas + r" \end{array}\right]}"
+
+
+def vector_tex(valores):
+    return matriz_tex([[v] for v in valores])
+
+
+def numero_vivo(texto, decimales=None):
+    """HTML de un numero que sube hasta su valor al aparecer; texto es como se ve al final."""
+    limpio = str(texto).replace("−", "-")
+    try:
+        valor = float(limpio)
+    except ValueError:
+        return f'<span class="numero-nuevo">{escapar(texto)}</span>'
+    if decimales is None:
+        decimales = len(limpio.split(".")[1]) if "." in limpio else 0
+    return f'<span data-contar="{valor!r}" data-decimales="{decimales}">{escapar(texto)}</span>'
+
+
+def grafica(opciones, alto="320px"):
+    """Grafica animada de ECharts (incluida en NiceGUI): lineas, escala log, tooltip y zoom."""
+    base = {
+        "animationDuration": 900, "animationEasing": "cubicOut",
+        "textStyle": {"fontFamily": "Inter, Segoe UI, sans-serif"},
+        "grid": {"left": 56, "right": 22, "top": 46, "bottom": 40},
+        "tooltip": {"trigger": "axis", "backgroundColor": "rgba(255,255,255,0.96)", "borderColor": "rgba(0,0,0,0.08)",
+                    "textStyle": {"color": "#1d1d1f", "fontSize": 12}},
+        "legend": {"top": 6, "icon": "roundRect", "textStyle": {"color": "#5f6368", "fontWeight": 600}},
+    }
+    base.update(opciones)
+    return ui.echart(base).classes("grafica-echart").style(f"height:{alto}")
 
 
 # Teclado de funciones: (etiqueta, ayuda, LaTeX para el editor matematico, texto para el campo de texto).

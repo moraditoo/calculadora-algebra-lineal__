@@ -1,205 +1,159 @@
 # frontend/modulos/matrices/vista.py
-# Operaciones con matrices: inversa, determinante, Ax = b, suma, producto...
+# Operaciones con matrices: A⁻¹ y det(A), determinante (LU o cofactores), transpuesta, c·A,
+# (A⁻¹)⁻¹, x = A⁻¹b, A + B, A − B y A × B.
+# La matriz se escribe en la cuadricula o se pega como texto (por ejemplo copiada de un PDF).
+import re
+
 from nicegui import ui
 
 from backend.algebra_lineal.matrices import OperacionesMatrices
 from ... import guia
-from ...componentes import (aviso, boton, caja, campo, cuadricula_entrada, desplegable_html, encabezado, entero, html,
-                            lista_pasos, matriz, matriz_html, redimensionar, resaltado, subtitulo, tarjeta, tarjetas_opcion)
+from ...componentes import (area_texto, aviso, boton, caja, campo, cuadricula_entrada, desplegable, encabezado, html,
+                            lista_pasos, matriz, matriz_tex, numero_vivo, redimensionar, segmentado, selector_numero,
+                            subtitulo, tarjeta, tex, valor_tex, vector_tex)
 from ...formato import escapar
 from .cofactores import nodo_html
 
+# (valor, texto del selector, que necesita: "A" cuadrada, "AB" otra matriz, "Ab" vector b, "rect" A de cualquier tamano)
 OPERACIONES = [
-    {"valor": "inversa", "titulo": "Inversa A⁻¹ [A | I]", "detalle": "Solo matriz A"},
-    {"valor": "inversa_de_inversa", "titulo": "(A⁻¹)⁻¹ = A", "detalle": "Solo matriz A"},
-    {"valor": "transponer", "titulo": "Transpuesta Aᵀ", "detalle": "Solo matriz A"},
-    {"valor": "determinante", "titulo": "Determinante det(A)", "detalle": "Cofactores o LU"},
-    {"valor": "escalar", "titulo": "Escalar c · A", "detalle": "Matriz A y una constante"},
-    {"valor": "resolver_por_inversa", "titulo": "Resolver x = A⁻¹b", "detalle": "Requiere vector b"},
-    {"valor": "suma", "titulo": "Suma A + B", "detalle": "Requiere matriz B"},
-    {"valor": "resta", "titulo": "Resta A − B", "detalle": "Requiere matriz B"},
-    {"valor": "multiplicar", "titulo": "Producto A × B", "detalle": "Requiere matriz B"},
+    ("inversa", "A⁻¹ y det(A)", "A"),
+    ("determinante", "det(A)", "A"),
+    ("transponer", "Aᵀ", "rect"),
+    ("escalar", "c · A", "rect"),
+    ("inversa_de_inversa", "(A⁻¹)⁻¹", "A"),
+    ("resolver_por_inversa", "x = A⁻¹b", "Ab"),
+    ("suma", "A + B", "AB"),
+    ("resta", "A − B", "AB"),
+    ("multiplicar", "A × B", "AB"),
 ]
-TITULO = {o["valor"]: o["titulo"] for o in OPERACIONES}
+NECESITA = {v: n for v, _, n in OPERACIONES}
+NUMERO = re.compile(r"[-−]?\d+(?:[.,]\d+)?(?:/\d+)?")
 
 
-def estimar_tiempo(n):
-    if n <= 4:
-        return "< 20 ms (inmediato)"
-    return {5: "~50 - 100 ms", 6: "~200 - 400 ms", 7: "~800 - 1500 ms"}.get(n, "~3 - 6 segundos (precisión racional)")
+def leer_texto_matriz(texto):
+    """'[ -4 5 -4 5 ]' por linea (o separado por comas) -> lista de filas de textos."""
+    filas = [NUMERO.findall(linea) for linea in (texto or "").splitlines()]
+    filas = [[v.replace("−", "-").replace(",", ".") for v in fila] for fila in filas if fila]
+    if not filas:
+        raise ValueError("Pegue la matriz con una fila por línea, por ejemplo: [ -4 5 -4 5 ]")
+    if len({len(f) for f in filas}) != 1:
+        raise ValueError("Todas las filas deben tener la misma cantidad de números.")
+    if len(filas) > 8 or len(filas[0]) > 8:
+        raise ValueError("El tamaño máximo es 8 × 8.")
+    return filas
 
 
 def construir():
-    e = {"op": "inversa", "metodo_det": "lu", "fa": 3, "ca": 3, "fb": 3, "cb": 1, "escalar": "2",
-         "A": [["0", "1", "2"], ["1", "0", "3"], ["4", "-3", "8"]], "B": [["3"], ["7"], ["0"]], "comparacion": None}
+    e = {"op": "inversa", "metodo_det": "lu", "fa": 4, "ca": 4, "cb": 1, "escalar": "2", "modo": "cuadricula",
+         "A": [["-4", "5", "-4", "5"], ["-3", "3", "-1", "3"], ["-3", "5", "1", "-1"], ["1", "-4", "-1", "-3"]],
+         "B": [["1"], ["0"], ["0"], ["0"]], "texto": ""}
     objetivos = {}
 
-    def requiere_vector_b():
-        return e["op"] == "resolver_por_inversa"
+    def cuadrada():
+        return NECESITA[e["op"]] in ("A", "Ab")
 
-    def requiere_matriz_b():
-        return e["op"] in ("suma", "resta", "multiplicar")
-
-    def sincronizar_b():
-        """La matriz B o el vector b toman el tamano que exige la operacion."""
-        if requiere_vector_b():
-            e.update(fb=e["fa"], cb=1)
+    def sincronizar():
+        """A se vuelve cuadrada si la operacion lo exige; B toma el tamano compatible con A."""
+        if cuadrada() and e["fa"] != e["ca"]:
+            e["ca"] = e["fa"]
+            e["A"] = redimensionar(e["A"], e["fa"], e["ca"])
+        necesita = NECESITA[e["op"]]
+        if necesita == "Ab":
+            filas_b, cols_b = e["fa"], 1
         elif e["op"] in ("suma", "resta"):
-            e.update(fb=e["fa"], cb=e["ca"])
-        elif e["op"] == "multiplicar":
-            e.update(fb=e["ca"], cb=max(e["cb"], 1))
-        e["B"] = redimensionar(e["B"], e["fb"], e["cb"])
+            filas_b, cols_b = e["fa"], e["ca"]
+        else:
+            filas_b, cols_b = e["ca"], e["cb"]
+        e["B"] = redimensionar(e["B"], filas_b, cols_b)
 
-    def advertencia():
-        fa, ca, fb, cb, op = e["fa"], e["ca"], e["fb"], e["cb"], e["op"]
-        if op in ("inversa", "inversa_de_inversa") and fa != ca:
-            return f"Teorema: la matriz debe ser cuadrada (n × n) para ser invertible. Dimensión actual: {fa}×{ca}."
-        if op == "determinante" and fa != ca:
-            return f"El determinante solo está definido para matrices cuadradas. Dimensión actual: {fa}×{ca}."
-        if op == "resolver_por_inversa":
-            if fa != ca:
-                return f"Teorema: para aplicar x = A⁻¹b la matriz A debe ser cuadrada. Dimensión actual: {fa}×{ca}."
-            if fb != fa or cb != 1:
-                return f"El vector b debe ser columna ({fa} × 1)."
-        if op in ("suma", "resta") and (fa != fb or ca != cb):
-            return f"Las matrices deben tener dimensiones idénticas: ({fa}×{ca}) contra ({fb}×{cb})."
-        if op == "multiplicar" and ca != fb:
-            return f"Incompatibles: las columnas de A ({ca}) deben coincidir con las filas de B ({fb})."
-        return None
-
-    # ---------------- Dialogo para matrices grandes ----------------
-    with ui.dialog() as dialogo, caja("vidrio tarjeta").style("max-width:430px"):
-        texto_dialogo = html("")
-        with caja("fila").style("justify-content:flex-end; margin-top:14px"):
-            boton("Cancelar", dialogo.close)
-            boton("Confirmar y generar", lambda: dialogo.submit(True), principal=True)
-
-    async def pedir_dimension(filas, columnas, aplicar):
-        if filas >= 5 or columnas >= 5:
-            texto_dialogo.set_content(
-                f'<h3 style="margin:0 0 8px; font-size:16px; font-weight:800; color:#1d1d1f">⚠ Matriz {filas} × {columnas}</h3>'
-                '<p class="texto-suave">El cálculo con fracciones exactas tiene complejidad <b>O(n³)</b>.</p>'
-                f'<div class="aviso advertencia mono">Tiempo estimado: {estimar_tiempo(max(filas, columnas))}</div>'
-                '<p class="texto-suave">¿Desea confirmar el tamaño y generar la cuadrícula?</p>')
-            if not await dialogo:
-                return
-        aplicar()
-
-    # ---------------- Entrada ----------------
     with tarjeta():
-        encabezado("Matrices y operaciones algebraicas",
-                   "Seleccione la operación; la matriz B o el vector b se ajustan solos al tamaño que exige.", "grid_on",
+        encabezado("Matrices", "Elija la operación, escriba o pegue la matriz y calcule.", "grid_on",
                    al_pedir_guia=lambda: guia.iniciar([
-                       (objetivos.get("operaciones"), "Operación", "Elija qué calcular."),
-                       (objetivos.get("dimensiones"), "Tamaño", "Filas y columnas de A (y de B cuando hace falta)."),
-                       (objetivos.get("entrada"), "Valores", "Acepta enteros, decimales y fracciones como 3/4."),
-                       (objetivos.get("ejecutar"), "Ejecutar", "Muestra el resultado con todo el procedimiento."),
+                       (objetivos.get("op"), "Operación", "«A⁻¹ y det(A)» calcula el determinante, la inversa y "
+                                                          "comprueba que A·A⁻¹ = I."),
+                       (objetivos.get("entrada"), "Matriz", "Cambie el tamaño con − y +, o elija «Pegar texto» para "
+                                                            "copiar la matriz tal como viene en el ejercicio."),
+                       (objetivos.get("calcular"), "Calcular", "El resultado aparece arriba; el procedimiento, plegado."),
                    ]))
-        with caja() as objetivos["operaciones"]:
-            tarjetas_opcion(OPERACIONES, lambda: e["op"], lambda v: cambiar_operacion(v), columnas="cinco")
+        with caja() as objetivos["op"]:
+            segmentado([(v, t) for v, t, _ in OPERACIONES], lambda: e["op"], lambda v: cambiar_operacion(v), envolver=True)
 
         @ui.refreshable
-        def controles():
-            aviso_texto = advertencia()
-            if aviso_texto:
-                aviso(aviso_texto, "advertencia").style("margin-top:14px")
+        def entrada():
+            necesita = NECESITA[e["op"]]
+            with caja("fila").style("align-items:flex-end; gap:22px; justify-content:space-between"):
+                with caja("fila").style("gap:22px"):
+                    if e["modo"] == "cuadricula":
+                        if cuadrada():
+                            selector_numero("Orden n", e["fa"], 1, 8, lambda v: cambiar_tamano(v, v))
+                        else:
+                            selector_numero("Filas de A", e["fa"], 1, 8, lambda v: cambiar_tamano(v, e["ca"]))
+                            selector_numero("Columnas de A", e["ca"], 1, 8, lambda v: cambiar_tamano(e["fa"], v))
+                        if e["op"] == "multiplicar":
+                            selector_numero("Columnas de B", e["cb"], 1, 8, lambda v: cambiar_columnas_b(v))
+                    if e["op"] == "escalar":
+                        campo("Escalar c", e["escalar"], lambda v: e.update(escalar=v), ancho="110px")
+                    if e["op"] == "determinante":
+                        with caja():
+                            html("Método", "etiqueta")
+                            segmentado([("lu", "LU"), ("cofactor", "Cofactores")], lambda: e["metodo_det"],
+                                       lambda v: e.update(metodo_det=v))
+                segmentado([("cuadricula", "Cuadrícula"), ("texto", "Pegar texto")], lambda: e["modo"], lambda v: cambiar_modo(v))
 
-            with caja("fila").style("margin-top:14px; gap:22px") as objetivos["dimensiones"]:
-                with caja("fila").style("gap:8px"):
-                    campo_fa = campo("Filas A", str(e["fa"]), lambda v: None, ancho="90px")
-                    campo_ca = campo("Columnas A", str(e["ca"]), lambda v: None, ancho="100px")
-                    boton("Aplicar", lambda: cambiar_a(campo_fa.value, campo_ca.value), icono="check")
-                if requiere_matriz_b():
-                    with caja("fila").style("gap:8px"):
-                        campo_fb = campo("Filas B", str(e["fb"]), lambda v: None, ancho="90px")
-                        campo_cb = campo("Columnas B", str(e["cb"]), lambda v: None, ancho="100px")
-                        boton("Aplicar", lambda: cambiar_b(campo_fb.value, campo_cb.value), icono="check")
-                if requiere_vector_b():
-                    html(f'Vector b: {e["fa"]} × 1 (sincronizado con las filas de A)', "chip").style("margin-bottom:4px")
-                if e["op"] == "escalar":
-                    campo("Escalar c", e["escalar"], lambda v: e.update(escalar=v), ancho="100px")
+            with caja("fila entrada-matrices").style("margin-top:12px; gap:22px; align-items:flex-start"):
+                with caja("caja"):
+                    subtitulo(f"Matriz A ({e['fa']} × {e['ca']})" if e["modo"] == "cuadricula" else "Matriz A").style(
+                        "margin-top:0")
+                    if e["modo"] == "cuadricula":
+                        cuadricula_entrada(e["A"])
+                    else:
+                        area_texto(e["texto"] or texto_de(e["A"]), lambda v: e.update(texto=v), filas=5).style(
+                            "min-width:280px")
+                        html('<div class="texto-suave nota-entrada">Una fila por línea; sirven [ -4 5 -4 5 ], '
+                             '«-4, 5, -4, 5» o fracciones como 3/4.</div>')
+                if necesita in ("AB", "Ab"):
+                    with caja("caja"):
+                        titulo = "Vector b" if necesita == "Ab" else "Matriz B"
+                        subtitulo(f"{titulo} ({len(e['B'])} × {len(e['B'][0])})").style("margin-top:0")
+                        cuadricula_entrada(e["B"], columna_destacada=0 if necesita == "Ab" else None)
 
-            with caja("caja fila").style("margin-top:14px; gap:26px; align-items:flex-start") as objetivos["entrada"]:
-                with caja():
-                    subtitulo(f"Matriz A ({e['fa']} × {e['ca']})")
-                    cuadricula_entrada(e["A"])
-                if requiere_matriz_b():
-                    with caja().style("border-left:1px solid rgba(0,0,0,0.08); padding-left:22px"):
-                        subtitulo(f"Matriz B ({e['fb']} × {e['cb']})")
-                        cuadricula_entrada(e["B"])
-                if requiere_vector_b():
-                    with caja().style("border-left:2px solid rgba(0,0,0,0.15); padding-left:22px"):
-                        subtitulo(f"Vector b ({e['fa']} × 1)")
-                        cuadricula_entrada(e["B"], columna_destacada=0)
-
-            if e["op"] == "determinante" and e["fa"] == e["ca"]:
-                subtitulo("Método para calcular det(A)")
-                actualizar_comparacion()
-                metodos_determinante()
-
-        @ui.refreshable
-        def metodos_determinante():
-            c = e["comparacion"]
-
-            def extra(metodo):
-                if not c:
-                    return ""
-                rapido = ' <span class="insignia verde">⚡ más rápido</span>' if c["recomendado"] == metodo else ""
-                return f'{c[metodo]["ops"]:,} operaciones · {escapar(c[metodo]["complejidad"])}{rapido}'
-
-            tarjetas_opcion([
-                {"valor": "cofactor", "titulo": "Expansión por cofactores", "detalle": "Laplace: Σ a[i,j]·(−1)^(i+j)·det(M[i,j])", "extra": extra("cofactor")},
-                {"valor": "lu", "titulo": "Descomposición LU", "detalle": "PA = LU  →  det(A) = (−1)^s · Π U[i,i]", "extra": extra("lu")},
-            ], lambda: e["metodo_det"], lambda v: e.update(metodo_det=v), columnas="dos")
-            if c:
-                mejor = "Ambos métodos cuestan lo mismo." if c["recomendado"] == "empate" else \
-                    f"Más rápido para esta matriz: {'Descomposición LU' if c['recomendado'] == 'lu' else 'Cofactores'}."
-                aviso(f"<b>{mejor}</b> {escapar(c['mensaje'])}<br><span style='font-size:11.5px'>Referencia para una matriz "
-                      f"{c['n']}×{c['n']} sin ceros: cofactores ≈ {c['cofactor']['ops_densa']:,} ops · LU ≈ {c['lu']['ops_densa']:,} ops.</span>",
-                      "info", es_html=True).style("margin-top:10px")
-
-        def actualizar_comparacion():
-            try:
-                e["comparacion"] = OperacionesMatrices.comparar_metodos_determinante(e["A"])
-            except Exception:
-                e["comparacion"] = None
-
-        controles()
-
-        with caja("fila").style("margin-top:16px") as objetivos["ejecutar"]:
-            boton_ejecutar = boton("", lambda: ejecutar(), icono="play_arrow", principal=True)
-            boton_comparar = boton("Actualizar comparación", lambda: (actualizar_comparacion(), metodos_determinante.refresh()),
-                                   icono="bolt")
-            boton_comparar.set_visibility(e["op"] == "determinante")
+        with caja().style("margin-top:14px") as objetivos["entrada"]:
+            entrada()
+        with caja("fila").style("margin-top:16px"):
+            objetivos["calcular"] = boton("Calcular", lambda: ejecutar(), icono="play_arrow", principal=True)
 
     def cambiar_operacion(valor):
         e["op"] = valor
-        sincronizar_b()
-        boton_ejecutar.set_text(f"Ejecutar: {TITULO[valor]}")
-        boton_comparar.set_visibility(valor == "determinante")
-        controles.refresh()
-        resultado.refresh()
+        sincronizar()
+        entrada.refresh()
 
-    async def cambiar_a(filas, columnas):
-        f, c = entero(filas, 1, 10, e["fa"]), entero(columnas, 1, 10, e["ca"])
+    def cambiar_tamano(filas, columnas):
+        e.update(fa=filas, ca=columnas, A=redimensionar(e["A"], filas, columnas), texto="")
+        sincronizar()
+        entrada.refresh()
 
-        def aplicar():
-            e.update(fa=f, ca=c, A=redimensionar(e["A"], f, c))
-            sincronizar_b()
-            controles.refresh()
-            resultado.refresh()
-        await pedir_dimension(f, c, aplicar)
+    def cambiar_columnas_b(columnas):
+        e["cb"] = columnas
+        sincronizar()
+        entrada.refresh()
 
-    async def cambiar_b(filas, columnas):
-        f, c = entero(filas, 1, 10, e["fb"]), entero(columnas, 1, 10, e["cb"])
+    def cambiar_modo(modo):
+        if modo == e["modo"]:
+            return
+        if modo == "cuadricula" and e["texto"]:
+            try:
+                usar_texto()
+            except ValueError as error:
+                ui.notify(str(error), type="warning", position="top")
+        e["modo"] = modo
+        e["texto"] = ""
+        entrada.refresh()
 
-        def aplicar():
-            e.update(fb=f, cb=c, B=redimensionar(e["B"], f, c))
-            controles.refresh()
-            resultado.refresh()
-        await pedir_dimension(f, c, aplicar)
-
-    boton_ejecutar.set_text(f"Ejecutar: {TITULO[e['op']]}")
+    def usar_texto():
+        """Pasa lo pegado a la matriz A (y ajusta el tamano)."""
+        filas = leer_texto_matriz(e["texto"])
+        e.update(A=filas, fa=len(filas), ca=len(filas[0]))
+        sincronizar()
 
     # ---------------- Resultados ----------------
     @ui.refreshable
@@ -209,139 +163,143 @@ def construir():
         if not d:
             return
         with tarjeta("escalonado"):
-            if op == "inversa":
-                resultado_inversa(d)
-            elif op == "inversa_de_inversa":
-                resultado_inversa_de_inversa(d)
-            elif op == "resolver_por_inversa":
-                resultado_resolver(d)
-            elif op == "determinante":
-                resultado_determinante(d)
-            if d.get("resultado"):
-                with caja("resaltado").style("display:block"):
-                    html('<div class="r-etiqueta" style="margin-bottom:10px">Matriz resultante</div>')
-                    matriz(d["resultado"], estilo=lambda i, j: "media")
-                if d.get("pasos"):
-                    subtitulo("Desglose elemento por elemento")
-                    lista_pasos(d["pasos"])
+            {"inversa": resultado_inversa, "inversa_de_inversa": resultado_inversa_de_inversa,
+             "resolver_por_inversa": resultado_resolver, "determinante": resultado_determinante}.get(
+                op, resultado_matriz)(d)
+
+    def resultado_matriz(d):
+        with caja("resaltado").style("display:block"):
+            html('<div class="r-etiqueta">Resultado</div>')
+            tex(matriz_tex(d["resultado"]), bloque=True, clases="formula-ancha")
+        if d.get("pasos"):
+            with desplegable("Cálculo elemento por elemento").style("margin-top:12px"):
+                lista_pasos(d["pasos"])
+
+    def bloque_determinante(det, detalle=""):
+        with caja("resaltado"):
+            html(f'<div><div class="r-etiqueta">Determinante</div>'
+                 f'<div class="r-valor mono">det(A) = {numero_vivo(det)}</div>'
+                 f'{f"<div class=r-detalle>{escapar(detalle)}</div>" if detalle else ""}</div>')
+            estado = "invertible" if det != "0" else "singular"
+            html(f'<span class="estado-metodo {"exito" if det != "0" else "error"}"><span class="material-icons">'
+                 f'{"check_circle" if det != "0" else "block"}</span>A es {estado}</span>')
 
     def resultado_inversa(d):
+        if d.get("determinante") is not None:
+            bloque_determinante(d["determinante"], d["motivo"])
         if not d["invertible"]:
-            aviso(f"<b>{escapar(d['motivo'])}</b><br>{escapar(d['detalle'])}", "error", es_html=True)
+            aviso(f"{d['motivo']} {d['detalle']}", "error").style("margin-top:12px")
             return
-        n = d.get("n") or len(d["inversa"])
-        aviso(d["motivo"], "exito")
-        with caja("rejilla dos"):
-            with caja("resaltado").style("display:block"):
-                html(f'<div class="r-etiqueta" style="margin-bottom:10px">Matriz inversa A⁻¹ ({n} × {n})</div>')
-                matriz(d["inversa"], estilo=lambda i, j: "media")
+        n = d["n"]
+        with caja("rejilla dos").style("margin-top:12px"):
             with caja("caja"):
-                subtitulo(f"Comprobación A · A⁻¹ = I{n}")
-                matriz(d["verificacion_identidad"], estilo=lambda i, j: "fuerte" if i == j else "tenue")
-        html(desplegable_html(f"Demostración del producto A · A⁻¹ = I{n} entrada por entrada",
-                              "".join(f'<div class="mono" style="font-size:12px">{escapar(l)}</div>' for l in d["detalles_verificacion"])))
-        subtitulo("Transformación de [A | I] hacia [I | A⁻¹]")
-        with caja("rejilla dos"):
-            for descripcion, mat in d["pasos_matrices"]:
-                corte = (len(mat[0]) if mat and mat[0] else n * 2) // 2
-                with caja("caja"):
-                    html(f'<div style="font-size:12.5px; font-weight:700; margin-bottom:8px">{escapar(descripcion)}</div>')
-                    matriz(mat, corte=corte, compacta=True, estilo=lambda i, j, c=corte: "verde" if j >= c else "")
+                subtitulo(f"Matriz inversa A⁻¹ ({n} × {n})").style("margin-top:0")
+                tex(r"A^{-1} = " + matriz_tex(d["inversa"]), bloque=True, clases="formula-ancha")
+            with caja("caja"):
+                subtitulo(f"Comprobación A · A⁻¹ = I{_sub(n)}").style("margin-top:0")
+                tex(r"A\,A^{-1} = " + matriz_tex(d["verificacion_identidad"]), bloque=True, clases="formula-ancha")
+                if d["es_identidad"]:
+                    html('<span class="chip-diagnostico si"><span class="material-icons">check</span>'
+                         'El producto es la identidad: la inversa es correcta.</span>')
+        with desplegable(f"Procedimiento: [A | I] → [I | A⁻¹] ({len(d['pasos_matrices']) - 1} operaciones)").style(
+                "margin-top:12px"):
+            with caja("rejilla dos"):
+                for descripcion, mat in d["pasos_matrices"]:
+                    with caja("caja"):
+                        html(f'<div class="titulo-paso">{escapar(descripcion)}</div>')
+                        matriz(mat, corte=n, compacta=True, estilo=lambda i, j: "verde" if j >= n else "")
+        with desplegable("Comprobación entrada por entrada").style("margin-top:8px"):
+            lista_pasos(d["detalles_verificacion"])
 
     def resultado_inversa_de_inversa(d):
         if not d["invertible"]:
             aviso(d["motivo"], "error")
             return
         aviso(d["teorema"], "exito")
-        with caja("rejilla dos"):
+        with caja("rejilla dos").style("margin-top:12px"):
             with caja("caja"):
-                subtitulo("Primera inversa A⁻¹")
-                matriz(d["A_inversa"])
+                subtitulo("Primera inversa A⁻¹").style("margin-top:0")
+                tex(matriz_tex(d["A_inversa"]), bloque=True, clases="formula-ancha")
             with caja("resaltado").style("display:block"):
-                html('<div class="r-etiqueta" style="margin-bottom:10px">Inversa de la inversa (A⁻¹)⁻¹</div>')
-                matriz(d["A_inversa_de_inversa"], estilo=lambda i, j: "media")
+                html('<div class="r-etiqueta">(A⁻¹)⁻¹</div>')
+                tex(matriz_tex(d["A_inversa_de_inversa"]), bloque=True, clases="formula-ancha")
+                if d["coincide"]:
+                    html('<span class="chip-diagnostico si"><span class="material-icons">check</span>'
+                         'Coincide con A</span>')
 
     def resultado_resolver(d):
         if not d["resuelto"]:
-            aviso(f"{d['motivo']} — {d['detalle']}", "error")
+            aviso(f"{d['motivo']} {d['detalle']}", "error")
             return
-        aviso(d["teorema"], "exito")
-        resaltado("Vector solución x = A⁻¹b", "x = [" + ", ".join(d["x_solucion"]) + "]")
-        subtitulo("Cálculo del producto A⁻¹ · b")
-        lista_pasos(d["pasos_multiplicacion"])
+        with caja("resaltado").style("display:block"):
+            html('<div class="r-etiqueta">Solución x = A⁻¹·b</div>')
+            chips = "".join(f'<span class="chip-solucion mono"><span class="nombre-var">x{_sub(i + 1)}</span> = '
+                            f'{numero_vivo(v)}</span>' for i, v in enumerate(d["x_solucion"]))
+            html(f'<div class="solucion-vector">{chips}</div><div class="r-detalle">{escapar(d["teorema"])}</div>')
+        with caja("caja").style("margin-top:12px"):
+            tex("x = " + matriz_tex(d["A_inversa"]) + vector_tex([fila[0] for fila in e["B"]]) + " = " +
+                vector_tex(d["x_solucion"]), bloque=True, clases="formula-ancha")
+        with desplegable("Producto A⁻¹ · b paso a paso").style("margin-top:12px"):
+            lista_pasos(d["pasos_multiplicacion"])
 
     def resultado_determinante(d):
-        comparacion = d["comparacion"]
-        otro = ""
-        if comparacion["recomendado"] not in ("empate", d["metodo"]):
-            otro = f'<br><span style="color:#1d1d1f">(el otro método habría usado {comparacion[comparacion["recomendado"]]["ops"]:,})</span>'
-        resaltado(f"det(A) por {'descomposición LU' if d['metodo'] == 'lu' else 'cofactores'}", f"det(A) = {d['determinante']}",
-                  derecha=f'<div style="text-align:right; font-size:12.5px; font-weight:700; color:#5f6368">'
-                          f'{d["operaciones"]:,} operaciones aritméticas{otro}</div>')
-        if d["determinante"] == "0":
-            aviso("det(A) = 0 → la matriz es singular (no invertible).", "advertencia")
-
-        if d["metodo"] == "cofactor" and d.get("arbol"):
-            subtitulo("Expansión por cofactores paso a paso")
-            html('<div class="leyenda"><span><i style="background:rgba(0,0,0,0.1);border:1px solid rgba(0,0,0,0.15)"></i>línea de expansión</span>'
-                 '<span><i style="background:#fff;border:2px solid #3a3a3c"></i>elemento a[i,j]</span>'
-                 '<span><i style="background:rgba(0,0,0,0.03);border:1px solid rgba(0,0,0,0.12)"></i>fila y columna eliminadas</span></div>')
-            html(nodo_html(d["arbol"]), "caja desplazable").style("overflow-x:auto; margin-top:10px")
-            if d["n"] > 4:
-                html(f'<div class="texto-suave">Para orden {d["n"]} solo se despliegan los primeros niveles; '
-                     'los menores restantes se muestran con su determinante.</div>')
-
+        metodo = "descomposición LU" if d["metodo"] == "lu" else "cofactores"
+        bloque_determinante(d["determinante"], f"Por {metodo} · {d['operaciones']:,} operaciones aritméticas")
         if d["metodo"] == "lu":
-            with caja("rejilla tres"):
-                for titulo, datos, estilo in (
-                    ("P (permutación)", d["P"], None),
-                    ("L (triangular inferior)", d["L"], lambda i, j: "media" if j <= i else "tenue"),
-                    ("U (triangular superior)", d["U"], lambda i, j: "fuerte" if i == j else ("verde" if j > i else "tenue")),
-                ):
+            with caja("rejilla tres").style("margin-top:12px"):
+                for titulo, datos in (("P", d["P"]), ("L", d["L"]), ("U", d["U"])):
                     with caja("caja"):
-                        subtitulo(titulo)
-                        matriz(datos, estilo=estilo)
-            if d.get("comprobacion"):
-                comp = d["comprobacion"]
-                subtitulo("Comprobación: L × U = P × A")
-                aviso("L × U coincide entrada por entrada con P × A: la factorización es correcta." if comp["coincide"]
-                      else "L × U no coincide con P × A: la factorización no es válida.", "exito" if comp["coincide"] else "error")
-                with caja("rejilla dos").style("margin-top:10px"):
-                    for titulo, datos in (("L × U", comp["LU"]), ("P × A", comp["PA"])):
+                        subtitulo(titulo).style("margin-top:0")
+                        tex(matriz_tex(datos), bloque=True, clases="formula-ancha")
+            diagonal = r" \cdot ".join(f"({valor_tex(v)})" for v in d["diagonal_U"])
+            signo = "-" if d["intercambios"] % 2 else ""
+            tex(rf"\det(A) = {signo}{diagonal} = {valor_tex(d['determinante'])}", bloque=True,
+                clases="formula-ancha formula-final")
+            with desplegable("Eliminación hacia U paso a paso").style("margin-top:12px"):
+                with caja("rejilla dos"):
+                    for descripcion, mat in d["pasos_matrices"]:
                         with caja("caja"):
-                            subtitulo(titulo)
-                            matriz(datos)
-                html(desplegable_html("Ver comprobación entrada por entrada",
-                                      "".join(f'<div class="mono" style="font-size:12px; white-space:pre">{escapar(l)}</div>'
-                                              for l in comp["detalles"]))).style("margin-top:10px")
-            subtitulo("Eliminación hacia U")
-            with caja("rejilla dos"):
-                for descripcion, mat in d["pasos_matrices"]:
-                    with caja("caja"):
-                        html(f'<div style="font-size:12.5px; font-weight:700; margin-bottom:8px">{escapar(descripcion)}</div>')
-                        matriz(mat, compacta=True)
-
-        titulo_pasos = "Ver desarrollo en texto" if d["metodo"] == "cofactor" else "Desarrollo paso a paso"
-        html(desplegable_html(titulo_pasos, "".join(f'<div class="mono" style="font-size:12px; white-space:pre">{escapar(l)}</div>'
-                                                    for l in d["pasos"]), abierto=d["metodo"] != "cofactor")).style("margin-top:12px")
+                            html(f'<div class="titulo-paso">{escapar(descripcion)}</div>')
+                            matriz(mat, compacta=True)
+        elif d.get("arbol"):
+            with desplegable("Expansión por cofactores", abierto=d["n"] <= 3).style("margin-top:12px"):
+                html(nodo_html(d["arbol"]), "desplazable").style("overflow-x:auto")
+                if d["n"] > 4:
+                    html('<div class="texto-suave">Para orden mayor que 4 solo se despliegan los primeros niveles.</div>')
+        with desplegable("Desarrollo en texto").style("margin-top:8px"):
+            lista_pasos(d["pasos"], preformateado=True)
 
     def ejecutar():
         op = e["op"]
         try:
-            B = e["B"] if requiere_vector_b() or requiere_matriz_b() else None
+            if e["modo"] == "texto" and e["texto"]:
+                usar_texto()
+            A = e["A"]
+            if cuadrada() and len(A) != len(A[0]):
+                raise ValueError(f"Esta operación necesita una matriz cuadrada; A es {len(A)} × {len(A[0])}.")
+            B = e["B"]
             llamadas = {
-                "suma": lambda: OperacionesMatrices.sumar(e["A"], B),
-                "resta": lambda: OperacionesMatrices.restar(e["A"], B),
-                "escalar": lambda: OperacionesMatrices.escalar(e["escalar"], e["A"]),
-                "multiplicar": lambda: OperacionesMatrices.multiplicar(e["A"], B),
-                "transponer": lambda: OperacionesMatrices.transponer(e["A"]),
-                "inversa": lambda: OperacionesMatrices.calcular_inversa_gauss_jordan(e["A"]),
-                "inversa_de_inversa": lambda: OperacionesMatrices.inversa_de_inversa(e["A"]),
-                "resolver_por_inversa": lambda: OperacionesMatrices.resolver_por_inversa(e["A"], B),
-                "determinante": lambda: OperacionesMatrices.determinante(e["A"], e["metodo_det"]),
+                "suma": lambda: OperacionesMatrices.sumar(A, B),
+                "resta": lambda: OperacionesMatrices.restar(A, B),
+                "escalar": lambda: OperacionesMatrices.escalar(e["escalar"], A),
+                "multiplicar": lambda: OperacionesMatrices.multiplicar(A, B),
+                "transponer": lambda: OperacionesMatrices.transponer(A),
+                "inversa": lambda: OperacionesMatrices.calcular_inversa_gauss_jordan(A),
+                "inversa_de_inversa": lambda: OperacionesMatrices.inversa_de_inversa(A),
+                "resolver_por_inversa": lambda: OperacionesMatrices.resolver_por_inversa(A, B),
+                "determinante": lambda: OperacionesMatrices.determinante(A, e["metodo_det"]),
             }
             resultado.refresh(op, llamadas[op]())
-        except Exception as error:
+        except ValueError as error:
             resultado.refresh(error=str(error))
 
-    resultado()
+    with caja("auto-animar"):
+        resultado()
+
+
+def texto_de(matriz_valores):
+    return "\n".join("[ " + "  ".join(str(v) for v in fila) + " ]" for fila in matriz_valores)
+
+
+def _sub(n):
+    return str(n).translate(str.maketrans("0123456789", "₀₁₂₃₄₅₆₇₈₉"))

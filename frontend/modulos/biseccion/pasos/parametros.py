@@ -12,9 +12,8 @@ from . import decimales
 def construir(vista):
     e = vista.estado
     html('<div class="subtitulo" style="margin-top:0">Paso 3 · Parámetros del método</div>')
-    html('<div class="texto-suave">Escriba su propio intervalo [a, b] o elija uno de los <b>recomendados</b> por la gráfica. '
-         'Antes de iterar se prueba que f sea continua y que f(a)·f(b) &lt; 0 (Bolzano). '
-         'El método se detiene cuando el error es <b>menor que la precisión E</b>.</div>')
+    html('<div class="texto-suave">Elija un intervalo recomendado o escriba [a, b]; se comprueba Bolzano '
+         '(f(a)·f(b) &lt; 0) antes de iterar.</div>')
 
     def cambiar(nombre, valor):
         setattr(e, nombre, valor)

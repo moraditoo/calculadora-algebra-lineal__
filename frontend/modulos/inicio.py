@@ -1,11 +1,10 @@
 # frontend/modulos/inicio.py
-# Pantalla principal. Tiene cuatro partes:
+# Pantalla principal. Tiene dos partes:
 #   1) Resolucion rapida: se escribe una funcion o una ecuacion (tambien sin igualar a cero)
 #      (sen(x) = −2x + 1), se ve como queda f(x) = 0, su grafica y sus raices, y con un clic
 #      se abre el metodo elegido con todo cargado.
-#   2) Los metodos para raices: abiertos (Newton-Raphson y secante) destacados, y cerrados.
-#   3) Comparacion de Newton-Raphson y la secante (como en la presentacion de clase).
-#   4) Las demas herramientas (algebra lineal y sistemas numericos).
+#   2) Todos los modulos agrupados en tarjetas compactas (con la comparacion de Newton-Raphson
+#      y la secante plegada debajo de los metodos de raices).
 from nicegui import run, ui
 
 from backend.metodos_numericos import graficas
@@ -13,7 +12,7 @@ from backend.metodos_numericos.analizador import ErrorFuncion, Funcion
 from backend.metodos_numericos.newton_raphson import newton_raphson
 from backend.metodos_numericos.secante import secante
 from backend.metodos_numericos.vista_rapida import explorar
-from ..componentes import aviso, caja, html, plano, tarjeta
+from ..componentes import aviso, caja, desplegable, html, plano, tarjeta
 from ..formato import escapar
 
 # Ecuaciones de muestra (las del curso y algunas sin igualar a cero)
@@ -35,69 +34,6 @@ ACCIONES = [
     ("biseccion", "Bisección", "my_location", "Mitad de [a, b]"),
     ("regla_falsa", "Regla falsa", "timeline", "Recta entre a y b"),
 ]
-
-
-# ----------------------------------------------------------------------
-# Ilustraciones de las tarjetas de Newton-Raphson y secante: se calculan con el
-# problema conductor de la clase, f(x) = x³ − x − 2, para que sean exactas.
-# ----------------------------------------------------------------------
-_ANCHO, _ALTO = 440, 150
-_X0, _X1, _Y0, _Y1 = 0.9, 2.12, -2.7, 5.6
-
-
-def _f(x):
-    return x ** 3 - x - 2
-
-
-def _p(x, y):
-    px = 14 + (x - _X0) / (_X1 - _X0) * (_ANCHO - 28)
-    py = _ALTO - 12 - (y - _Y0) / (_Y1 - _Y0) * (_ALTO - 24)
-    return f"{px:.1f}", f"{py:.1f}"
-
-
-def _curva():
-    puntos = [_p(_X0 + i * (_X1 - _X0) / 80, _f(_X0 + i * (_X1 - _X0) / 80)) for i in range(81)]
-    return "M " + " L ".join(f"{x} {y}" for x, y in puntos)
-
-
-def _linea(x1, y1, x2, y2, clase):
-    a, b = _p(x1, y1), _p(x2, y2)
-    return f'<line class="{clase}" x1="{a[0]}" y1="{a[1]}" x2="{b[0]}" y2="{b[1]}"/>'
-
-
-def _punto(x, y, clase, r=4):
-    cx, cy = _p(x, y)
-    return f'<circle class="{clase}" cx="{cx}" cy="{cy}" r="{r}"/>'
-
-
-def _ilustracion(tipo):
-    eje_izq, eje_der = _p(_X0, 0), _p(_X1, 0)
-    partes = [f'<line class="eje" x1="{eje_izq[0]}" y1="{eje_izq[1]}" x2="{eje_der[0]}" y2="{eje_der[1]}"/>',
-              f'<path class="curva" d="{_curva()}"/>']
-    if tipo == "newton":
-        x = 2.0
-        for k in range(1, 3):
-            y, pendiente = _f(x), 3 * x ** 2 - 1
-            siguiente = x - y / pendiente
-            partes.append(_linea(x, y, siguiente, 0, f"recta r{k}"))
-            partes.append(_punto(x, y, f"punto q{k}"))
-            partes.append(_linea(siguiente, 0, siguiente, _f(siguiente), f"guia r{k}"))
-            partes.append(_punto(siguiente, 0, f"corte q{k}", 3.4))
-            x = siguiente
-    else:
-        anterior, actual = 1.0, 2.0
-        for k in range(1, 3):
-            fa, fb = _f(anterior), _f(actual)
-            siguiente = actual - fb * (actual - anterior) / (fb - fa)
-            partes.append(_linea(anterior, fa, actual, fb, f"recta r{k}"))
-            partes.append(_punto(anterior, fa, f"punto q{k}"))
-            partes.append(_punto(actual, fb, f"punto q{k}"))
-            partes.append(_punto(siguiente, 0, f"corte q{k}", 3.4))
-            anterior, actual = actual, siguiente
-    partes.append(_punto(1.5213797, 0, "raiz-ilustracion", 5))
-    texto = "Tangentes de Newton-Raphson" if tipo == "newton" else "Secantes por dos puntos"
-    return (f'<svg viewBox="0 0 {_ANCHO} {_ALTO}" role="img" aria-label="{texto} acercándose a la raíz">'
-            + "".join(partes) + "</svg>")
 
 
 def _iteraciones_de_clase():
@@ -306,65 +242,39 @@ class ResolucionRapida:
 # ----------------------------------------------------------------------
 # Pantalla completa
 # ----------------------------------------------------------------------
+FORMULAS = {
+    "newton": "xₙ₊₁ = xₙ − f(xₙ) / f′(xₙ)",
+    "secante": "xₙ₊₁ = xₙ − f(xₙ)·(xₙ − xₙ₋₁) / [f(xₙ) − f(xₙ₋₁)]",
+    "biseccion": "c = (a + b) / 2",
+    "regla_falsa": "c = b − f(b)·(a − b) / [f(a) − f(b)]",
+    "iterativos": "xᵢ⁽ᵏ⁺¹⁾ = [bᵢ − Σ aᵢⱼ xⱼ] / aᵢᵢ",
+}
+
+
 def construir(grupos, abrir, resolver):
     """grupos: el registro de modulos de aplicacion.py; abrir(id) cambia al modulo elegido;
     resolver(id, texto, x) abre un metodo de raices con la funcion o ecuacion ya cargada."""
-    modulos = {m.id: m for _, lista in grupos for m in lista}
-
     ResolucionRapida(resolver)
-    metodos_de_raices(modulos, abrir)
-    comparacion()
-    otras_herramientas(grupos, abrir)
+    with tarjeta("escalonado"):
+        for titulo, lista in grupos:
+            html(f'<div class="subtitulo grupo-inicio">{escapar(titulo)}</div>')
+            with caja("rejilla herramientas"):
+                for m in lista:
+                    tarjeta_modulo(m, abrir)
+            if titulo == "Métodos abiertos":
+                comparacion()
     html('<div class="pie-inicio"><span><span class="tecla">Ctrl K</span> buscar un módulo</span>'
-         '<span>·</span><span>Escriba ecuaciones con <b>=</b> en cualquier método de raíces</span>'
          '<span>·</span><span>Funciona sin conexión a internet</span></div>')
 
 
-def metodos_de_raices(modulos, abrir):
-    with tarjeta("escalonado"):
-        with caja("seccion-cabeza"):
-            html('<div><div class="subtitulo" style="margin:0">Métodos para encontrar raíces</div>'
-                 '<h2 class="seccion-titulo">Abiertos: rápidos, parten de valores iniciales</h2></div>')
-            html('<div class="texto-suave seccion-nota">No necesitan un intervalo que encierre la raíz; convergen '
-                 'rápido, pero no garantizan convergencia para cualquier valor inicial.</div>')
-        with caja("rejilla dos"):
-            tarjeta_abierta(modulos["newton"], abrir, "newton", "xₙ₊₁ = xₙ − f(xₙ) / f′(xₙ)",
-                            ["1 valor inicial", "usa f′(x)", "tangente"])
-            tarjeta_abierta(modulos["secante"], abrir, "secante", "xₙ₊₁ = xₙ − f(xₙ)·(xₙ − xₙ₋₁) / [f(xₙ) − f(xₙ₋₁)]",
-                            ["2 valores iniciales", "sin derivada", "secante"])
-        html('<h2 class="seccion-titulo" style="margin-top:24px">Cerrados: seguros, encierran la raíz en [a, b]</h2>')
-        with caja("rejilla dos"):
-            for id_modulo, formula in (("biseccion", "c = (a + b) / 2"),
-                                       ("regla_falsa", "c = b − f(b)·(a − b) / [f(a) − f(b)]")):
-                tarjeta_cerrada(modulos[id_modulo], abrir, formula)
-
-
-def tarjeta_abierta(m, abrir, tipo, formula, etiquetas):
+def tarjeta_modulo(m, abrir):
     insignia = '<span class="insignia verde">NUEVO</span>' if m.nuevo else ""
-    chips = "".join(f'<span class="etiqueta-metodo">{escapar(t)}</span>' for t in etiquetas)
-    tarjeta_html = html(
-        f'<div class="metodo-ilustracion {tipo}">{_ilustracion(tipo)}</div>'
-        '<div class="metodo-cuerpo">'
-        f'<div class="modulo-cabeza"><span class="modulo-icono"><span class="material-icons">{m.icono}</span></span>{insignia}</div>'
-        f'<div class="metodo-nombre">{escapar(m.nombre)}</div>'
-        f'<div class="opcion-detalle">{escapar(m.descripcion)}</div>'
-        f'<div class="metodo-formula mono">{escapar(formula)}</div>'
-        f'<div class="etiquetas-metodo">{chips}</div>'
-        '<div class="modulo-abrir">Abrir método <span class="material-icons">arrow_forward</span></div>'
-        "</div>",
-        "opcion metodo-destacado")
-    tarjeta_html.on("click", lambda: abrir(m.id))
-
-
-def tarjeta_cerrada(m, abrir, formula):
-    tarjeta_html = html(
-        f'<span class="modulo-icono"><span class="material-icons">{m.icono}</span></span>'
-        f'<div class="cerrado-texto"><div class="opcion-titulo">{escapar(m.nombre)}</div>'
-        f'<div class="opcion-detalle">{escapar(m.descripcion)}</div>'
-        f'<div class="metodo-formula mono pequena">{escapar(formula)}</div></div>'
-        '<span class="material-icons cerrado-flecha">arrow_forward</span>',
-        "opcion metodo-cerrado")
-    tarjeta_html.on("click", lambda: abrir(m.id))
+    formula = f'<div class="metodo-formula mono pequena">{escapar(FORMULAS[m.id])}</div>' if m.id in FORMULAS else ""
+    fila = html(f'<span class="modulo-icono"><span class="material-icons">{m.icono}</span></span>'
+                f'<div class="herramienta-texto"><div class="opcion-titulo">{escapar(m.nombre)} {insignia}</div>'
+                f'<div class="opcion-detalle">{escapar(m.descripcion)}</div>{formula}</div>',
+                "opcion herramienta")
+    fila.on("click", lambda i=m.id: abrir(i))
 
 
 def comparacion():
@@ -374,27 +284,6 @@ def comparacion():
     filas += (f'<tr class="destacada"><th>Ejemplo de clase<br><span class="mono">x³ − x − 2, E = 10⁻⁶</span></th>'
               f'<td><b class="mono">{n_newton}</b> iteraciones desde x₀ = 1.5</td>'
               f'<td><b class="mono">{n_secante}</b> iteraciones desde x₀ = 1, x₁ = 2</td></tr>')
-    with tarjeta("escalonado"):
-        with caja("seccion-cabeza"):
-            html('<div><div class="subtitulo" style="margin:0">Comparación</div>'
-                 '<h2 class="seccion-titulo">¿Newton-Raphson o secante?</h2></div>')
-            html('<div class="texto-suave seccion-nota">Si la derivada es fácil de obtener, Newton-Raphson suele '
-                 'llegar en menos iteraciones. Si derivar es difícil o costoso, la secante es la alternativa.</div>')
+    with desplegable("¿Newton-Raphson o secante?").style("margin-top:12px"):
         html('<table class="tabla-comparacion"><thead><tr><th>Criterio</th><th>Newton-Raphson</th><th>Secante</th>'
              f'</tr></thead><tbody>{filas}</tbody></table>', "contenedor-comparacion")
-
-
-def otras_herramientas(grupos, abrir):
-    with tarjeta("escalonado"):
-        html('<div class="subtitulo" style="margin-top:0">Más herramientas</div>')
-        with caja("rejilla herramientas"):
-            for titulo, lista in grupos:
-                if titulo.startswith("Métodos"):
-                    continue
-                for m in lista:
-                    fila = html(f'<span class="modulo-icono"><span class="material-icons">{m.icono}</span></span>'
-                                f'<div><div class="herramienta-grupo">{escapar(titulo)}</div>'
-                                f'<div class="opcion-titulo">{escapar(m.nombre)}</div>'
-                                f'<div class="opcion-detalle">{escapar(m.descripcion)}</div></div>',
-                                "opcion herramienta")
-                    fila.on("click", lambda i=m.id: abrir(i))

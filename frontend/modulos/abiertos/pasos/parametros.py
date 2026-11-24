@@ -15,12 +15,9 @@ def construir(vista):
     e = vista.estado
     dos = vista.VALORES == 2
     html('<div class="subtitulo" style="margin-top:0">Paso 3 · Parámetros del método</div>')
-    html('<div class="texto-suave">El valor inicial lo elige <b>usted</b>: escriba ' +
-         ("<b>x₀</b> y <b>x₁</b>" if dos else "<b>x₀</b>") +
-         ' mirando la gráfica del paso 2 (o haga clic sobre ella en ese paso); se aceptan números o expresiones como '
-         '<span class="mono">pi/2</span>, <span class="mono">sqrt(2)</span> o <span class="mono">10^-4</span>. Es un método abierto: no hace falta un '
-         'intervalo que encierre la raíz, pero conviene empezar cerca de ella; si x₀ está lejos el método puede '
-         'divergir o llegar a otra raíz.</div>')
+    html('<div class="texto-suave">Escriba ' + ("<b>x₀</b> y <b>x₁</b>" if dos else "<b>x₀</b>") +
+         ' cerca de la raíz (acepta pi/2, sqrt(2) o 10^-4). Se itera hasta que el error sea menor que E '
+         'o se llegue al máximo de iteraciones.</div>')
 
     def cambiar(nombre, valor):
         setattr(e, nombre, valor)
@@ -45,9 +42,6 @@ def construir(vista):
                               "x₀ es el punto donde se traza la primera tangente")
                              + "; E es la tolerancia y el máximo de iteraciones evita cálculos interminables."))
 
-    aviso("El método se detiene con la primera de estas dos condiciones: <b>1)</b> el error es menor que la "
-          "tolerancia E (converge) o <b>2)</b> se llega al máximo de iteraciones. Al final se indica si el método <b>converge</b> (las aproximaciones se acercan a una raíz) o <b>diverge</b> (no se acercan o se alejan).",
-          "info", es_html=True).style("margin-top:12px")
 
     async def usar_recomendado(iv):
         valores = vista.valores_de_intervalo(iv)
@@ -76,10 +70,6 @@ def construir(vista):
                     texto = ", ".join(f"{'x₀' if n == 'x0' else 'x₁'} = {v:g}" for n, v in valores.items())
                     boton(f'I{iv["numero"]} → {texto}', lambda iv=iv: usar_recomendado(iv),
                           principal=iv["numero"] == e.intervalo_activo, clases="compacto")
-            html('<div class="texto-suave" style="margin-top:6px">Salen de los intervalos del paso 2, donde f(a)·f(b) &lt; 0: '
-                 + ("se usan sus dos extremos como x₀ y x₁." if dos else
-                    "x₀ es el extremo donde |f| es menor (la curva está más cerca del eje x) y f'(x₀) ≠ 0.")
-                 + " Son solo una sugerencia: puede escribir cualquier otro valor cercano a la raíz.</div>")
         vista.pasos_guia.append((fila, "Valores recomendados",
                                  "Salen de los intervalos donde f cambia de signo (paso 2): "
                                  + ("x₀ y x₁ son sus extremos." if dos else "x₀ es el extremo donde |f| es menor.")))

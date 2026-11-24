@@ -1,7 +1,6 @@
 # backend/algebra_lineal/vectores.py
-from fractions import Fraction
-from .gauss import format_frac, parse_frac
-from .gauss_jordan import MetodoGaussJordan
+from .fracciones import format_frac, parse_frac
+from .sistemas import resolver_sistema
 
 class OperacionesVectores:
     @staticmethod
@@ -115,17 +114,16 @@ class OperacionesVectores:
             fila = [vectores_k[j][i] for j in range(k)] + [b[i]]
             matriz.append(fila)
 
-        solver = MetodoGaussJordan()
-        pasos_eliminacion, matriz_final = solver.eliminar_gauss_jordan(matriz, n, k)
-        clasificacion = solver.clasificar_sistema(matriz_final, n, k)
+        datos = resolver_sistema(matriz, "gauss_jordan", [f"c{i + 1}" for i in range(k)])
+        tipo = datos["clasificacion"]
+        clasificacion = tipo["texto"]
+        es_cl = tipo["tipo"] != "ninguna"
+        solucion_pesos = datos["solucion"]
+        pasos_eliminacion = [(descripcion, mat) for descripcion, mat, _ in datos["pasos"]]
 
-        es_cl = "Inconsistente" not in clasificacion
-        solucion_pesos = None
-
-        if es_cl and "Determinado" in clasificacion:
-            sol, _ = solver.extraer_solucion(matriz_final, n, k)
-            solucion_pesos = [format_frac(x) for x in sol]
-            detalles = f"El vector b SÍ es combinación lineal única con pesos: " + ", ".join(f"c_{i+1} = {solucion_pesos[i]}" for i in range(k))
+        if tipo["tipo"] == "unica":
+            detalles = "El vector b SÍ es combinación lineal única con pesos: " + ", ".join(
+                f"c{i + 1} = {solucion_pesos[i]}" for i in range(k))
         elif es_cl:
             detalles = "El vector b SÍ es combinación lineal (existen infinitas combinaciones de pesos)."
         else:

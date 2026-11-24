@@ -1,6 +1,6 @@
 # backend/algebra_lineal/matrices.py
 from fractions import Fraction
-from .gauss import format_frac, parse_frac
+from .fracciones import format_frac, parse_frac
 
 class OperacionesMatrices:
     @staticmethod
@@ -128,168 +128,69 @@ class OperacionesMatrices:
 
     @classmethod
     def calcular_inversa_gauss_jordan(cls, A_raw):
+        """A⁻¹ por Gauss-Jordan sobre [A | I]. En la misma pasada se obtiene det(A):
+        (−1)^intercambios · producto de los pivotes. Si det(A) = 0 no hay inversa."""
         fa, ca = cls.validar_matriz(A_raw, "Matriz A")
-        
-        # Salida anticipada 1: Matriz estrictamente cuadrada
         if fa != ca:
             return {
-                "invertible": False,
-                "n": fa,
-                "motivo": "TEOREMA: La matriz debe ser estrictamente cuadrada (n x n) para tener inversa.",
-                "detalle": f"La matriz ingresada tiene orden {fa}x{ca}.",
-                "pasos": [f"Salida anticipada: Matriz no cuadrada ({fa}x{ca})."]
+                "invertible": False, "n": fa, "determinante": None,
+                "motivo": "Solo las matrices cuadradas (n × n) pueden tener inversa.",
+                "detalle": f"La matriz tiene orden {fa} × {ca}.",
             }
-
         n = fa
-        A = [[parse_frac(val) for val in fila] for fila in A_raw]
+        A = [[parse_frac(v) for v in fila] for fila in A_raw]
+        aumentada = [A[i][:] + [Fraction(int(i == j)) for j in range(n)] for i in range(n)]
+        pasos_matrices = [("[A | I] inicial", [[format_frac(c) for c in fila] for fila in aumentada])]
+        det = Fraction(1)
 
-        # Salida anticipada 2: Filas o Columnas de ceros
-        for i in range(n):
-            if all(A[i][j] == 0 for j in range(n)):
-                return {
-                    "invertible": False,
-                    "n": n,
-                    "motivo": "TEOREMA DE LA MATRIZ INVERTIBLE: Fila nula detectada.",
-                    "detalle": f"La fila {i+1} contiene solo ceros. det(A) = 0.",
-                    "pasos": [f"Salida anticipada: Fila {i+1} nula. Matriz singular."]
-                }
-        for j in range(n):
-            if all(A[i][j] == 0 for i in range(n)):
-                return {
-                    "invertible": False,
-                    "n": n,
-                    "motivo": "TEOREMA DE LA MATRIZ INVERTIBLE: Columna nula detectada.",
-                    "detalle": f"La columna {j+1} contiene solo ceros.",
-                    "pasos": [f"Salida anticipada: Columna {j+1} nula. Matriz singular."]
-                }
-
-        # Salida anticipada 3: Dependencia lineal entre filas
-        for i in range(n):
-            for k in range(i + 1, n):
-                ratio = None
-                proporcional = True
-                for j in range(n):
-                    if A[i][j] == 0 and A[k][j] == 0:
-                        continue
-                    if A[i][j] == 0 or A[k][j] == 0:
-                        proporcional = False
-                        break
-                    r_act = A[k][j] / A[i][j]
-                    if ratio is None:
-                        ratio = r_act
-                    elif ratio != r_act:
-                        proporcional = False
-                        break
-                if proporcional and ratio is not None:
-                    return {
-                        "invertible": False,
-                        "n": n,
-                        "motivo": "TEOREMA: Dependencia lineal (Filas proporcionales).",
-                        "detalle": f"La Fila {k+1} es multiplo de la Fila {i+1} (factor {format_frac(ratio)}).",
-                        "pasos": [f"Salida anticipada: Filas dependientes {i+1} y {k+1}. det(A) = 0."]
-                    }
-
-        # Salida anticipada 4: Determinante en matrices 2x2
-        if n == 2:
-            a, b = A[0][0], A[0][1]
-            c, d = A[1][0], A[1][1]
-            det = a * d - b * c
-            if det == 0:
-                return {
-                    "invertible": False,
-                    "n": 2,
-                    "motivo": "TEOREMA 2x2: det(A) = ad - bc = 0.",
-                    "detalle": f"({format_frac(a)})({format_frac(d)}) - ({format_frac(b)})({format_frac(c)}) = 0.",
-                    "pasos": ["Salida anticipada: Determinante nulo."]
-                }
-
-        # Construccion de [A | I_n]
-        aumentada = []
-        for i in range(n):
-            identidad = [Fraction(1) if i == j else Fraction(0) for j in range(n)]
-            aumentada.append([parse_frac(A_raw[i][j]) for j in range(n)] + identidad)
-
-        pasos_matrices = [("Paso 1: Construccion de la Matriz Aumentada inicial [A | I]:", 
-                           [[format_frac(c) for c in fila] for fila in aumentada])]
-        detalles_explicativos = [
-            f"Se construye la matriz aumentada [A | I_{n}] de orden {n}x{2*n}.",
-            "Se aplican operaciones elementales por fila para transformar [A | I] en [I | A^-1]."
-        ]
-
-        # Eliminacion Gauss-Jordan
         for col in range(n):
-            max_fila = col
-            for i in range(col + 1, n):
-                if abs(aumentada[i][col]) > abs(aumentada[max_fila][col]):
-                    max_fila = i
-
+            # Pivoteo parcial: se sube la fila con mayor |valor| (si todos son 0, A es singular)
+            max_fila = max(range(col, n), key=lambda i: abs(aumentada[i][col]))
             if aumentada[max_fila][col] == 0:
                 return {
-                    "invertible": False,
-                    "n": n,
-                    "motivo": "TEOREMA DE LA MATRIZ INVERTIBLE: Columna sin pivote no nulo.",
-                    "detalle": f"En la columna {col+1} todos los pivotes son cero. Rango menor a {n}.",
-                    "pasos": [f"Salida anticipada: Ausencia de pivote en columna {col+1}."]
+                    "invertible": False, "n": n, "determinante": "0",
+                    "motivo": "det(A) = 0: la matriz es singular y no tiene inversa.",
+                    "detalle": f"En la columna {col + 1} no queda ningún pivote distinto de cero (rango menor que {n}).",
+                    "pasos_matrices": pasos_matrices,
                 }
-
             if max_fila != col:
                 aumentada[col], aumentada[max_fila] = aumentada[max_fila], aumentada[col]
-                desc = f"Intercambio: Fila {col+1} <-> Fila {max_fila+1} (Pivoteo Parcial)"
-                pasos_matrices.append((desc, [[format_frac(c) for c in fila] for fila in aumentada]))
-                detalles_explicativos.append(f"• Intercambio Fila {col+1} con Fila {max_fila+1} por maximo pivote.")
-
+                det = -det
+                pasos_matrices.append((f"F{col + 1} ↔ F{max_fila + 1}",
+                                       [[format_frac(c) for c in fila] for fila in aumentada]))
             pivote = aumentada[col][col]
+            det *= pivote
             if pivote != 1:
-                for j in range(2 * n):
-                    aumentada[col][j] /= pivote
-                desc = f"Normalizacion: Fila {col+1} / ({format_frac(pivote)}) para hacer pivote = 1"
-                pasos_matrices.append((desc, [[format_frac(c) for c in fila] for fila in aumentada]))
-                detalles_explicativos.append(f"• Fila {col+1} normalizada dividiendo entre {format_frac(pivote)}.")
-
+                aumentada[col] = [v / pivote for v in aumentada[col]]
+                pasos_matrices.append((f"F{col + 1} → F{col + 1} ÷ ({format_frac(pivote)})",
+                                       [[format_frac(c) for c in fila] for fila in aumentada]))
             for i in range(n):
-                if i != col and aumentada[i][col] != 0:
-                    factor = aumentada[i][col]
-                    for j in range(2 * n):
-                        aumentada[i][j] -= factor * aumentada[col][j]
-                    desc = f"Eliminacion: Fila {i+1} - ({format_frac(factor)}) * Fila {col+1}"
-                    pasos_matrices.append((desc, [[format_frac(c) for c in fila] for fila in aumentada]))
-                    detalles_explicativos.append(f"• Anulando posicion ({i+1},{col+1}) mediante Fila {i+1} - ({format_frac(factor)})*Fila {col+1}.")
+                factor = aumentada[i][col]
+                if i != col and factor != 0:
+                    aumentada[i] = [v - factor * p for v, p in zip(aumentada[i], aumentada[col])]
+                    pasos_matrices.append((f"F{i + 1} → F{i + 1} − ({format_frac(factor)})·F{col + 1}",
+                                           [[format_frac(c) for c in fila] for fila in aumentada]))
 
-        # Extraer A^-1 de la mitad derecha
-        A_inv = [[aumentada[i][n + j] for j in range(n)] for i in range(n)]
-        A_inv_str = [[format_frac(c) for c in fila] for fila in A_inv]
-
-        # Verificacion formal termino a termino A * A^-1 = I_n
-        verif_I = []
-        detalles_verificacion = []
+        A_inv = [fila[n:] for fila in aumentada]
+        # Comprobacion A · A⁻¹ = I entrada por entrada
+        producto, detalles_verificacion = [], []
         for i in range(n):
             fila_v = []
             for j in range(n):
-                sumandos = []
-                suma = Fraction(0)
-                for k in range(n):
-                    va = A[i][k]
-                    vb = A_inv[k][j]
-                    prod = va * vb
-                    suma += prod
-                    sumandos.append(f"({format_frac(va)})*({format_frac(vb)})")
+                suma = sum(A[i][k] * A_inv[k][j] for k in range(n))
                 fila_v.append(format_frac(suma))
-                esperado = "1 [Diagonal]" if i == j else "0 [Fuera de diagonal]"
-                detalles_verificacion.append(
-                    f"Posicion ({i+1},{j+1}) [Fila {i+1} de A . Col {j+1} de A^-1]: "
-                    f"{' + '.join(sumandos)} = {format_frac(suma)} [{esperado}]"
-                )
-            verif_I.append(fila_v)
+                sumandos = " + ".join(f"({format_frac(A[i][k])})({format_frac(A_inv[k][j])})" for k in range(n))
+                detalles_verificacion.append(f"({i + 1},{j + 1}): {sumandos} = {format_frac(suma)}")
+            producto.append(fila_v)
+        identidad = all(producto[i][j] == ("1" if i == j else "0") for i in range(n) for j in range(n))
 
         return {
-            "invertible": True,
-            "n": n,
-            "motivo": f"Matriz equivalente por filas a I_{n}. Se obtuvo la inversa por Gauss-Jordan.",
-            "inversa": A_inv_str,
-            "verificacion_identidad": verif_I,
-            "detalles_explicativos": detalles_explicativos,
+            "invertible": True, "n": n, "determinante": format_frac(det),
+            "motivo": f"det(A) = {format_frac(det)} ≠ 0, por lo tanto A es invertible.",
+            "inversa": [[format_frac(c) for c in fila] for fila in A_inv],
+            "verificacion_identidad": producto, "es_identidad": identidad,
             "detalles_verificacion": detalles_verificacion,
-            "pasos_matrices": pasos_matrices
+            "pasos_matrices": pasos_matrices,
         }
 
     @classmethod
@@ -307,7 +208,7 @@ class OperacionesMatrices:
         return {
             "invertible": True,
             "n": paso1["n"],
-            "teorema": "Teorema: Si A es invertible, entonces (A^-1)^-1 = A.",
+            "teorema": "Si A es invertible, (A⁻¹)⁻¹ = A.",
             "A_original": A_orig_eval,
             "A_inversa": A_inv,
             "A_inversa_de_inversa": A_inv_inv,
@@ -334,7 +235,7 @@ class OperacionesMatrices:
             return {
                 "resuelto": False,
                 "n": fa,
-                "motivo": "No se puede resolver x = A^-1 * b porque A es singular.",
+                "motivo": "No se puede usar x = A⁻¹·b porque A es singular (det(A) = 0).",
                 "detalle": inv_res["detalle"]
             }
 
@@ -345,7 +246,7 @@ class OperacionesMatrices:
         return {
             "resuelto": True,
             "n": fa,
-            "teorema": "Teorema: Si A es invertible, Ax = b tiene la solucion unica x = A^-1 * b.",
+            "teorema": "A es invertible, así que Ax = b tiene la solución única x = A⁻¹·b.",
             "A_inversa": A_inv,
             "x_solucion": x_sol,
             "pasos_multiplicacion": mult_res["pasos"]

@@ -5,19 +5,15 @@ import re
 
 from nicegui import ui
 
-from ....componentes import aviso, boton, caja, campo, html, segmentado, subtitulo, teclado
+from ....componentes import aviso, boton, caja, campo, desplegable, html, segmentado, subtitulo, teclado
 from ....formato import escapar
 
 
 def construir(vista):
     e = vista.estado
     html('<div class="subtitulo" style="margin-top:0">Paso 1 · Escriba la función f(x) o la ecuación</div>')
-    html('<div class="texto-suave">Escríbala tal como en el cuaderno: los exponentes se ven arriba (x⁴), '
-         'las fracciones se arman con <b>/</b> y la raíz con <b>sqrt</b>. Se buscará la raíz de f(x) = 0. '
-         'Si el ejercicio trae una <b>ecuación sin igualar a cero</b>, como <span class="mono">sen(x) = −2x + 1</span>, '
-         'escríbala completa con el signo <b>=</b>: el programa pasa todo al lado izquierdo y arma f(x). '
-         'También puede usar el <b>teclado de funciones</b> de abajo; mientras escribe se indica si está bien '
-         'escrita o qué le falta.</div>')
+    html('<div class="texto-suave">Tal como en el cuaderno. Una ecuación con <b>=</b> (sen(x) = −2x + 1) '
+         'se pasa sola a la forma f(x) = 0.</div>')
 
     temporizador = {"actual": None}
 
@@ -78,7 +74,7 @@ def construir(vista):
         # El teclado escribe en el campo que esta en su misma zona (editor matematico o texto)
         with caja().props("data-zona-teclado") as zona:
             editor()
-            teclado()
+            teclado(abierto=False)
         vista.pasos_guia.append((zona, "Teclado de funciones",
                                  "Cada tecla escribe donde está el cursor: sen, cos, tan, sus inversas, ln, log, √, |x|, "
                                  "fracciones y potencias. Funciona en el editor matemático y en el modo texto."))
@@ -110,11 +106,10 @@ def construir(vista):
         vista_previa()
         vista.despues_de_formula()
 
-        aviso("Funciones disponibles: sen, cos, tan, sec, csc, cot, sus inversas (arcsen o sen⁻¹, arccos o cos⁻¹, "
-              "arctan o tan⁻¹…), senh, cosh, tanh, sech, csch, coth y sus inversas, ln (natural), log (base 10), "
-              "log2, e^x, sqrt, cbrt, |x| y pi. Se puede escribir 5x en lugar de 5·x, y una ecuación completa con "
-              "'=' (por ejemplo x³ = 2x + 5). Los ángulos van en radianes.",
-              "info").style("margin-top:14px")
+        with desplegable("¿Qué se puede escribir?").style("margin-top:14px"):
+            html('<div class="texto-suave">sen, cos, tan, sec, csc, cot y sus inversas (arcsen o sen⁻¹…), senh, cosh, '
+                 'tanh y sus inversas, ln (natural), log (base 10), log2, e^x, sqrt, cbrt, |x| y pi. Se puede escribir '
+                 '5x en lugar de 5·x y una ecuación completa con «=». Los ángulos van en radianes.</div>')
 
     ejemplos_resueltos(vista)
 
@@ -133,23 +128,22 @@ def construir(vista):
 
 
 def ejemplos_resueltos(vista):
-    """Tarjetas con ejemplos ya preparados: se cargan en la gráfica o se resuelven de una vez."""
+    """Ejemplos ya preparados en tarjetas compactas: un clic los resuelve; el icono de la
+    grafica solo los carga para elegir el intervalo."""
     subtitulo("Ejemplos resueltos")
-    html('<div class="texto-suave">Cargue un ejemplo para ver todo el método: la gráfica con su intervalo, '
-         'las iteraciones hasta que el error es menor que E y la conclusión.</div>')
-    with caja("rejilla tres").style("margin-top:12px") as rejilla:
+    with caja("rejilla ejemplos-compactos") as rejilla:
         for ejemplo in vista.EJEMPLOS:
-            with caja("opcion ejemplo"):
-                html(f'<div class="opcion-titulo">{escapar(ejemplo["titulo"])}</div>'
+            with caja("ejemplo-compacto") as tarjeta_ejemplo:
+                html(f'<div class="ejemplo-titulo">{escapar(ejemplo["titulo"])}</div>'
                      f'<div class="ejemplo-funcion mono">{escapar(texto_ejemplo(ejemplo))}</div>'
-                     f'<div class="opcion-detalle">{escapar(ejemplo["detalle"])}</div>'
-                     f'<div class="opcion-extra mono">{vista.resumen_ejemplo(ejemplo)}</div>')
-                with caja("fila").style("gap:6px"):
-                    boton("Graficar", lambda ej=ejemplo: vista.cargar_ejemplo(ej), icono="show_chart", clases="compacto")
-                    boton("Resolver", lambda ej=ejemplo: vista.cargar_ejemplo(ej, resolver=True),
-                          icono="play_arrow", principal=True, clases="compacto")
+                     f'<div class="ejemplo-resumen mono">{vista.resumen_ejemplo(ejemplo)}</div>').props(
+                    f'title="{escapar(ejemplo["detalle"])}"')
+                graficar = html('<span class="material-icons">show_chart</span>', "ejemplo-graficar").props(
+                    'title="Solo graficar"')
+                graficar.on("click.stop", lambda ej=ejemplo: vista.cargar_ejemplo(ej))
+            tarjeta_ejemplo.on("click", lambda ej=ejemplo: vista.cargar_ejemplo(ej, resolver=True))
     vista.pasos_guia.append((rejilla, "Ejemplos resueltos",
-                             "Graficar carga el ejemplo y muestra sus intervalos; Resolver lo ejecuta y va directo a las iteraciones."))
+                             "Un clic resuelve el ejemplo y va a las iteraciones; el icono de la gráfica solo lo carga."))
 
 
 def texto_ejemplo(ejemplo):

@@ -4,7 +4,6 @@
 from nicegui import ui
 
 from ....componentes import aviso, caja, campo, html, segmentado, subtitulo, teclado
-from ....formato import escapar
 
 # Puntos donde se compara la derivada escrita con la calculada
 PUNTOS_PRUEBA = (0.4, 0.9, 1.3, 1.7, -0.3, -0.7, -1.5, 2.6, 3.4, -2.5, 6.5, -9, 11, 45, -40)
@@ -86,13 +85,10 @@ def seccion(vista):
                 segmentado([("auto", "Calcularla automáticamente"), ("escrita", "Escribirla")],
                            lambda: "escrita" if e.usar_derivada_escrita else "auto", lambda modo: cambiar_modo(modo))
         if vista.USA_DERIVADA:
-            html('<div class="texto-suave">Newton-Raphson necesita f\'(x) para trazar la tangente. El programa la deriva '
-                 'solo con las reglas de derivación (potencia, producto, cociente y cadena) para polinomios, raíces, '
-                 'exponenciales, logaritmos, trigonométricas, hiperbólicas, sus inversas y |x|. '
-                 'También puede escribirla y se comprueba que coincida.</div>')
+            html('<div class="texto-suave">Se calcula sola con las reglas de derivación; si la escribe a mano, se '
+                 'comprueba que coincida.</div>')
         else:
-            html('<div class="texto-suave">La secante <b>no necesita</b> f\'(x): aproxima la pendiente con dos puntos de la curva. '
-                 'Igual se muestra la derivada para comparar, en cada iteración, la pendiente de la secante con la de la tangente.</div>')
+            html('<div class="texto-suave">La secante no la necesita; se muestra solo para comparar pendientes.</div>')
 
         @ui.refreshable
         def entrada():
@@ -125,8 +121,6 @@ def seccion(vista):
                     html('<span class="estado-escritura bien">✓ Bien escrita</span>').style("margin-left:auto")
             vista.pasos_guia.append((marco, "Derivada f'(x)",
                                      "Así queda la derivada que se usa en cada iteración (la tangente tiene pendiente f'(xₙ))."))
-            if d is not None:
-                html(f'<div class="texto-suave mono" style="margin-top:6px">f\'(x) = {escapar(d.legible)}</div>')
             if vista.USA_DERIVADA and e.usar_derivada_escrita and d is not None:
                 comparar(d)
 

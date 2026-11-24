@@ -19,11 +19,25 @@ RECURSOS = CARPETA / "recursos"
 #   driver.js -> guia que resalta paso a paso las partes importantes
 #   plano.js  -> grafica interactiva de f(x) con zoom y paneo (hecha para este programa)
 #   teclado.js -> teclado de funciones (sen, cos, ln, √...) que escribe en el editor o en el texto
+#   KaTeX      -> formulas y matrices bien dibujadas en los resultados (usa las fuentes de MathLive)
+#   CountUp.js -> los numeros de los resultados suben hasta su valor
+#   auto-animate -> transiciones suaves cuando aparecen o desaparecen partes de la pantalla
+#   realce.js  -> activa KaTeX, CountUp y auto-animate en cada elemento nuevo (hecho para este programa)
+#   (las graficas de convergencia usan ECharts, que ya viene incluido en NiceGUI)
 app.add_static_files("/recursos", RECURSOS)
 LIBRERIAS = """
 <link rel="stylesheet" href="/recursos/driver/driver.css">
+<link rel="stylesheet" href="/recursos/katex/katex.min.css">
 <script src="/recursos/driver/driver.js.iife.js"></script>
 <script src="/recursos/mathlive/mathlive.min.js"></script>
+<script src="/recursos/katex/katex.min.js"></script>
+<script src="/recursos/countup/countUp.umd.js"></script>
+<script type="module">
+  import autoAnimate from '/recursos/autoanimate/index.mjs';
+  window.autoAnimate = autoAnimate;
+  window.dispatchEvent(new Event('autoanimate-listo'));
+</script>
+<script src="/recursos/realce/realce.js"></script>
 <script src="/recursos/plano/plano.js"></script>
 <script src="/recursos/teclado/teclado.js"></script>
 <script>

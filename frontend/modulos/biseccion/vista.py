@@ -7,7 +7,7 @@ from nicegui import run, ui
 from backend.metodos_numericos import biseccion as metodo
 from backend.metodos_numericos import graficas
 from ... import guia
-from ...componentes import caja, encabezado, html, tarjeta
+from ...componentes import caja, encabezado, html, numero_vivo, tarjeta
 from ...formato import con_signo, escapar, numero
 from .ejemplos import EJEMPLOS
 from .estado import NOMBRE_ERROR, PASOS, Estado
@@ -104,7 +104,8 @@ class VistaBiseccion:
         with tarjeta():
             encabezado(self.TITULO, self.DESCRIPCION, self.ICONO, al_pedir_guia=lambda: guia.iniciar(self.pasos_guia))
             self.barra_pasos()
-        self.tarjetas_resultado()
+        with caja("auto-animar"):
+            self.tarjetas_resultado()
         self.panel()
         # Contenedor fijo (nunca se redibuja) para los temporizadores de la vista
         self.anclaje = ui.element("div")
@@ -151,28 +152,29 @@ class VistaBiseccion:
     def tarjetas_resultado(self):
         r = self.estado.resultado
         d = self.estado.decimales
-        animar = " numero-nuevo" if self.kpi_recien_calculado else ""
+        self.tarjeta_raiz = None
+        # Sin resultado no se muestran tarjetas vacias: aparecen (animadas) al resolver
+        if not r:
+            return
+        recien = self.kpi_recien_calculado
         self.kpi_recien_calculado = False
-        if r and "veredicto" in r:   # metodos abiertos: converge o diverge
+        if "veredicto" in r:   # metodos abiertos: converge o diverge
             estado_metodo = {"converge": "Converge", "lenta": "Converge lento (sin llegar a E)",
                              "diverge": "Diverge"}[r["veredicto"]["tipo"]]
-        elif r:
-            estado_metodo = "Converge" if r["convergio"] else "No converge"
         else:
-            estado_metodo = "Sin calcular"
+            estado_metodo = "Converge" if r["convergio"] else "No converge"
         datos = [
-            ("Iteraciones", str(r["total_iteraciones"]) if r else "—", estado_metodo),
-            ("Raíz aproximada", numero(r["raiz"], d) if r else "—",
-             f"f({self.PUNTO}) = {con_signo(r['f_raiz'], 6)}" if r else "Complete el paso 3"),
-            ("Error", numero(r["error_final"], d) if r else "—",
-             (f"{self.NOMBRES_ERROR[r['criterio']]} {'<' if r['convergio'] else '≥'} E = {r['tolerancia']:g}") if r else f"E = {self.estado.tolerancia}"),
+            ("Iteraciones", str(r["total_iteraciones"]), estado_metodo),
+            ("Raíz aproximada", numero(r["raiz"], d), f"f({self.PUNTO}) = {con_signo(r['f_raiz'], 6)}"),
+            ("Error", numero(r["error_final"], d),
+             f"{self.NOMBRES_ERROR[r['criterio']]} {'<' if r['convergio'] else '≥'} E = {r['tolerancia']:g}"),
         ]
-        self.tarjeta_raiz = None
         with caja("kpis escalonado"):
             for titulo, valor, pie in datos:
-                elemento = html(f'<div class="k-titulo">{titulo}</div><div class="k-valor mono{animar}">{escapar(valor)}</div>'
-                                f'<span class="chip{" azul" if r else ""}">{escapar(pie)}</span>',
-                                "vidrio kpi" + ("" if r else " vacio"))
+                # Recien calculado, el numero sube hasta su valor (CountUp)
+                valor_html = numero_vivo(valor) if recien else escapar(valor)
+                elemento = html(f'<div class="k-titulo">{titulo}</div><div class="k-valor mono">{valor_html}</div>'
+                                f'<span class="chip azul">{escapar(pie)}</span>', "vidrio kpi")
                 if titulo == "Raíz aproximada":
                     self.tarjeta_raiz = elemento
 
@@ -337,16 +339,15 @@ class VistaBiseccion:
         self.kpi_recien_calculado = True
         self.refrescar()
         self.ir_a(4)
-        # Se remarca el resultado mas importante (con una pausa para que la tarjeta ya este dibujada)
-        titulo = "Raíz encontrada"
-        mensaje = (f"Después de {resultado['total_iteraciones']} iteraciones la raíz aproximada es "
-                   f"{numero(resultado['raiz'], e.decimales)}. Abajo se explica cada iteración.")
+        # Aviso breve que no bloquea la pantalla (las tarjetas ya aparecen con el numero animado)
+        mensaje = (f"Raíz ≈ {numero(resultado['raiz'], e.decimales)} en {resultado['total_iteraciones']} "
+                   "iteraciones.")
+        tipo = "positive"
         veredicto = resultado.get("veredicto")
         if veredicto and veredicto["tipo"] != "converge":
-            titulo = "El método " + ("diverge" if veredicto["tipo"] == "diverge" else "no alcanzó E")
-            mensaje = f"{veredicto['explicacion']} Abajo se explica cada iteración."
+            mensaje, tipo = veredicto["explicacion"], "warning"
         with self.anclaje:
-            ui.timer(0.6, lambda: guia.resaltar(self.tarjeta_raiz, titulo, mensaje), once=True)
+            ui.notify(mensaje, type=tipo, position="top-right", timeout=3500, multi_line=True)
 
     async def cargar_grafica_iteracion(self, k):
         e = self.estado

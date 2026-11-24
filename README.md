@@ -1,7 +1,8 @@
 # Calculadora de álgebra lineal y métodos numéricos
 
 Todo el programa está en Python y separado en `backend/` (cálculos) y `frontend/` (interfaz).
-La interfaz usa NiceGUI con un tema de vidrio líquido blanco y las gráficas se hacen con matplotlib.
+La interfaz usa NiceGUI con un tema de vidrio líquido blanco; las gráficas se hacen con matplotlib y ECharts,
+y las fórmulas con KaTeX. Todas las librerías del navegador vienen incluidas: funciona sin internet.
 
 ## Instalación y uso
 
@@ -17,8 +18,50 @@ Se abre el navegador en http://localhost:8080.
 | Grupo | Módulo |
 | --- | --- |
 | Métodos numéricos | Método de Bisección · Método de Regla Falsa · Newton-Raphson · Método de la Secante |
-| Álgebra lineal | Ecuaciones lineales (Gauss-Jordan, pivote, Gauss) · Vectores Rⁿ · Matrices y Ax = b |
+| Álgebra lineal | Sistemas lineales (Gauss-Jordan, Gauss, pivoteo) · Jacobi y Gauss-Seidel · Vectores Rⁿ · Matrices |
 | Sistemas numéricos | Conversor de bases · Números romanos |
+
+## Sistemas de ecuaciones lineales
+
+Se escribe el sistema tal como viene en el ejercicio, una ecuación por línea (`-3x - y + 4z + 5w = -6`), o la matriz
+aumentada [A | B]. Acepta x, y, z, w (en ese orden) o x1, x2… / x₁, x₂…, fracciones, decimales, variables en los dos
+lados y signos copiados de un PDF (−). El resultado muestra primero lo importante:
+
+1. **Solución** con números animados (o la solución general si hay infinitas, o "sin solución").
+2. **Forma matricial A·X = B** dibujada con KaTeX y **det(A)**: si det(A) ≠ 0 la solución es única.
+3. **Comprobación** sustituyendo en cada ecuación original.
+4. **Procedimiento** (plegado): cada operación por fila con la fila que cambió resaltada.
+
+Los tres métodos comparten el mismo código (`backend/algebra_lineal/sistemas.py`): Gauss solo intercambia filas si el
+pivote es cero, el pivoteo parcial sube la fila de mayor |valor| y Gauss-Jordan llega a la forma escalonada reducida.
+
+## Jacobi y Gauss-Seidel
+
+Métodos iterativos para A·x = b, como en la presentación de clase. Se escribe el sistema (o la matriz), x⁽⁰⁾ (vacío =
+vector cero), la tolerancia ε, el máximo de iteraciones y el criterio de parada: cambio ‖x⁽ᵏ⁺¹⁾ − x⁽ᵏ⁾‖∞ < ε,
+residuo ‖b − Ax‖∞ < ε o ambos. Se puede ejecutar un método o **comparar ambos**.
+
+- **Convergencia:** tabla de dominancia diagonal |aᵢᵢ| > Σ|aᵢⱼ| y radio espectral ρ(T) de cada método (converge si
+  ρ < 1). Si el sistema no es diagonalmente dominante, se **reordenan las ecuaciones** (se puede desactivar): primero se
+  busca un orden dominante y, si no existe, el de menor ρ. Si ρ < 1 pero se acaban las iteraciones, se estima cuántas
+  faltan.
+- **Iteraciones:** tabla k, x₁…xₙ, cambio y residuo.
+- **Paso a paso:** la sustitución de cada componente con los números, igual que las diapositivas
+  (`(6 + 2.272727 − 2(−1.100000)) / 10 = 1.047273`).
+- **Gráficas (ECharts):** evolución de cada incógnita y error de los dos métodos en escala logarítmica.
+- **Despeje y convergencia:** cada incógnita despejada (KaTeX), la fórmula general y la tabla de dominancia.
+
+El ejemplo de clase (10x₁ − x₂ + 2x₃ = 6 …) da las mismas tablas que la presentación: Jacobi converge en 18 iteraciones
+y Gauss-Seidel en 8 con ε = 10⁻⁶. Las tablas de las diapositivas 16 y 22 coinciden con el programa; los cálculos
+sueltos de las diapositivas 15, 20 y 21 tienen erratas (por ejemplo x₂⁽²⁾ de Jacobi es 1.715909, no 1.704545, y
+x₄⁽¹⁾ de Gauss-Seidel es 0.878864, no 0.751591).
+
+## Matrices
+
+Operaciones: **A⁻¹ y det(A)** (en una sola pasada de Gauss-Jordan sobre [A | I]; justifica la inversa con
+det(A) ≠ 0 y comprueba A·A⁻¹ = I), det(A) por LU o cofactores, Aᵀ, c·A, (A⁻¹)⁻¹, x = A⁻¹b, A + B, A − B y A × B.
+El tamaño se cambia con − y + (hasta 8 × 8) y la matriz se puede **pegar como texto** tal como viene en el ejercicio
+(`[ -4 5 -4 5 ]` por fila). Las matrices del resultado se dibujan con fracciones (KaTeX) y el procedimiento queda plegado.
 
 ## Método de Bisección
 
@@ -28,7 +71,7 @@ Se abre el navegador en http://localhost:8080.
 4. **Iteraciones:** cada iteración se explica (punto medio, f(c), signos, error, decisión) con su gráfica y la tabla completa.
 5. **Conclusión:** iteraciones realizadas, solución y error, más las comprobaciones del algoritmo.
 
-En el paso 1 hay **ejemplos resueltos** (clase, polinomios, e⁻ˣ − x, cos x − x, √3, ln x, tres raíces, Wallis y tan x con asíntotas): **Graficar** los carga en la gráfica y **Resolver** los ejecuta y va directo a las iteraciones.
+En el paso 1 hay **ejemplos resueltos** (clase, polinomios, e⁻ˣ − x, cos x − x, √3, ln x, tres raíces, Wallis y tan x con asíntotas): un clic los resuelve y va directo a las iteraciones; el icono de la gráfica solo los carga.
 
 El botón **Guía paso a paso** resalta cada parte de la pantalla y explica para qué sirve.
 
@@ -92,8 +135,8 @@ Si al reducir se cancela un término que limita el dominio (ln x = ln x + x − 
 ## Pantalla principal
 
 - **Resolución rápida:** se escribe una función o una ecuación (hay pastillas con las del curso) y al instante se ve la función que usa el método, su gráfica interactiva y sus raíces aproximadas. Se elige la raíz y con un clic se abre Newton-Raphson, la secante, bisección o regla falsa con la función cargada, el intervalo marcado y el valor inicial propuesto. Enter abre Newton-Raphson.
-- **Métodos para encontrar raíces:** tarjetas de los métodos abiertos con su fórmula y una animación de las tangentes y secantes (calculada con x³ − x − 2), y los métodos cerrados.
-- **¿Newton-Raphson o secante?:** la tabla comparativa de la presentación y las iteraciones que necesita cada uno en el ejemplo de clase (las calcula el propio programa).
+- **Módulos:** todos los módulos en tarjetas compactas agrupadas, con su fórmula. Debajo de los métodos abiertos está
+  plegada la comparación **¿Newton-Raphson o secante?** (tabla de la presentación e iteraciones del ejemplo de clase).
 - **Buscador (Ctrl + K):** abre cualquier módulo escribiendo parte de su nombre.
 
 ## Decimales
@@ -107,12 +150,12 @@ main.py                         Arranca el programa (une backend y frontend)
 
 backend/                        Lógica y cálculos (no tiene nada de interfaz)
   algebra_lineal/
-    gauss.py                    Eliminación de Gauss y sustitución hacia atrás
-    gauss_jordan.py             Gauss-Jordan (forma escalonada reducida)
-    metodo_pivote.py            Pivoteo parcial
-    parser_ecuaciones.py        Lee sistemas escritos como texto
+    fracciones.py               Lectura y formato de fracciones exactas y determinante exacto
+    sistemas.py                 Gauss, pivoteo parcial y Gauss-Jordan (un solo recorrido), clasificación y comprobación
+    iterativos.py               Jacobi y Gauss-Seidel: dominancia, reordenamiento, radio espectral e iteraciones
+    parser_ecuaciones.py        Lee sistemas escritos como texto (x, y, z, w o x1, x2…)
     vectores.py                 Operaciones en Rⁿ y combinación lineal
-    matrices.py                 Inversa, determinante (cofactores y LU), Ax = b...
+    matrices.py                 Inversa con det(A), determinante (cofactores y LU), x = A⁻¹b...
   sistemas_numericos/
     conversor.py                Conversión entre bases
     romanos.py                  Aritmética y conversión de números romanos
@@ -128,11 +171,13 @@ backend/                        Lógica y cálculos (no tiene nada de interfaz)
 
 frontend/                       Interfaz gráfica en Python (NiceGUI)
   aplicacion.py                 Marco de vidrio, barra lateral, buscador (Ctrl + K) y registro de módulos
-  componentes.py                Piezas visuales compartidas
+  componentes.py                Piezas visuales compartidas (también fórmulas KaTeX, números animados y gráficas ECharts)
   guia.py                       Guía paso a paso (driver.js)
   formato.py                    Formato de números
   estilos.css                   Tema de vidrio líquido y animaciones
-  recursos/                     MathLive (editor matemático) y driver.js incluidos, funcionan sin internet
+  recursos/                     Librerías incluidas, funcionan sin internet: MathLive (editor matemático), driver.js
+                                (guía), KaTeX (fórmulas), CountUp.js (números animados) y auto-animate (transiciones)
+    realce/realce.js            Activa KaTeX, CountUp y auto-animate en cada elemento nuevo de la pantalla
     plano/plano.js              Gráfica interactiva de f(x) con zoom y paneo (hecha para este programa)
     teclado/teclado.js          Teclado de funciones que escribe en el editor matemático o en el texto
   modulos/
@@ -140,7 +185,9 @@ frontend/                       Interfaz gráfica en Python (NiceGUI)
     biseccion/                  Vista, estado, ejemplos resueltos y un archivo por paso (pasos/)
     regla_falsa/                Hereda la vista de bisección; solo cambia ejemplos, iteraciones, variante y algoritmo
     abiertos/                   Newton-Raphson y secante: heredan la vista de bisección (derivada, x₀, tabla, conclusión)
-    ecuaciones.py · vectores.py · conversor.py · romanos.py
+    ecuaciones.py               Sistemas lineales
+    iterativos.py               Jacobi y Gauss-Seidel
+    vectores.py · conversor.py · romanos.py
     matrices/                   Vista y dibujo de la expansión por cofactores
 ```
 

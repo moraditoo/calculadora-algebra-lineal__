@@ -34,7 +34,7 @@ CONSTANTES = {"pi": math.pi, "e": math.e}
 # Nombres ordenados de mayor a menor longitud: "exp" se reconoce antes que "e"
 _NOMBRES = sorted(list(FUNCIONES) + list(CONSTANTES), key=len, reverse=True)
 
-_SUPERINDICES = str.maketrans("⁰¹²³⁴⁵⁶⁷⁸⁹⁻", "0123456789-")
+_SUPERINDICES = str.maketrans("⁰¹²³⁴⁵⁶⁷⁸⁹⁻⁺ˣ", "0123456789-+x")
 _PRECEDENCIA = {"+": 1, "-": 1, "*": 2, "/": 2}
 
 # Notacion de funcion inversa del cuaderno: sen⁻¹ x = arcsen x, tan⁻¹ x = arctan x.
@@ -78,8 +78,11 @@ def normalizar(texto):
                          ("÷", "/"), ("**", "^"), ("√", "sqrt"), ("π", "pi"),
                          ("[", "("), ("]", ")"), ("{", "("), ("}", ")")):
         t = t.replace(viejo, nuevo)
-    # Superindices: x² -> x^2,  x⁻¹ -> x^-1
-    t = re.sub(r"[⁰¹²³⁴⁵⁶⁷⁸⁹⁻]+", lambda m: "^" + m.group(0).translate(_SUPERINDICES), t)
+    # Superindices: x² -> x^2,  x⁻¹ -> x^-1,  eˣ -> e^(x),  e⁻ˣ -> e^(-x)  (como se copian de un PDF)
+    def _exponente(m):
+        exponente = m.group(0).translate(_SUPERINDICES)
+        return "^(" + exponente + ")" if "x" in exponente else "^" + exponente
+    t = re.sub(r"[⁰¹²³⁴⁵⁶⁷⁸⁹⁻⁺ˣ]+", _exponente, t)
     # Coma decimal entre digitos: 0,5 -> 0.5
     t = re.sub(r"(\d),(\d)", r"\1.\2", t)
     return t

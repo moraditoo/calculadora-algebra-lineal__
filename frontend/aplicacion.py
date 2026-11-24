@@ -6,7 +6,8 @@ from nicegui import ui
 
 from .componentes import caja, html
 from .formato import escapar
-from .modulos import abiertos, biseccion, conversor, ecuaciones, inicio, matrices, regla_falsa, romanos, vectores
+from .modulos import (abiertos, biseccion, conversor, ecuaciones, inicio, iterativos, matrices, regla_falsa, romanos,
+                      vectores)
 
 
 class Modulo(NamedTuple):
@@ -23,10 +24,10 @@ class Modulo(NamedTuple):
 # Registro de modulos por grupo
 GRUPOS = [
     ("Métodos abiertos", [
-        Modulo("newton", "Método de Newton-Raphson", "Newton-Raphson", "trending_up", abiertos.construir_newton, True,
+        Modulo("newton", "Método de Newton-Raphson", "Newton-Raphson", "trending_up", abiertos.construir_newton, False,
                "Desde x₀ sigue la recta tangente. Calcula f'(x) automáticamente.",
                "tangente derivada abierto raiz ecuacion"),
-        Modulo("secante", "Método de la Secante", "Secante", "insights", abiertos.construir_secante, True,
+        Modulo("secante", "Método de la Secante", "Secante", "insights", abiertos.construir_secante, False,
                "Con x₀ y x₁ traza la recta secante, sin necesitar la derivada.",
                "secante abierto raiz ecuacion dos puntos"),
     ]),
@@ -39,13 +40,16 @@ GRUPOS = [
                "falsa posicion cerrado intervalo raiz"),
     ]),
     ("Álgebra lineal", [
-        Modulo("ecuaciones", "Ecuaciones lineales", "Sistemas lineales", "functions", ecuaciones.construir, False,
-               "Resuelve Ax = b por Gauss-Jordan, pivoteo parcial o Gauss, con fracciones exactas.",
-               "gauss jordan pivote sistema"),
+        Modulo("ecuaciones", "Sistemas de ecuaciones lineales", "Sistemas lineales", "functions", ecuaciones.construir,
+               False, "Resuelve A·X = B por Gauss-Jordan, Gauss o pivoteo, con fracciones exactas y det(A).",
+               "gauss jordan pivote sistema ecuaciones"),
+        Modulo("iterativos", "Jacobi y Gauss-Seidel", "Jacobi y Gauss-Seidel", "autorenew", iterativos.construir, True,
+               "Métodos iterativos para A·x = b: tabla de iteraciones, paso a paso, gráficas y convergencia.",
+               "jacobi gauss seidel iterativo dominancia diagonal convergencia"),
         Modulo("vectores", "Vectores Rⁿ", "Vectores Rⁿ", "north_east", vectores.construir, False,
                "Operaciones con vectores y si b es combinación lineal de ellos.", "combinacion lineal"),
-        Modulo("matrices", "Matrices y Ax = b", "Matrices", "grid_on", matrices.construir, False,
-               "Inversa, determinante (cofactores y LU), producto y sistemas Ax = b.",
+        Modulo("matrices", "Matrices", "Matrices", "grid_on", matrices.construir, False,
+               "Determinante e inversa (con comprobación), LU, cofactores, producto y x = A⁻¹b.",
                "determinante inversa cofactores lu producto"),
     ]),
     ("Sistemas numéricos", [
@@ -138,8 +142,9 @@ class Aplicacion:
         vista = self.vistas[id_modulo]
         vista.set_visibility(True)
         self.menu.refresh()
-        # Se repite la animacion de entrada y se vuelve al inicio del contenido
-        ui.run_javascript(
+        # Se repite la animacion de entrada y se vuelve al inicio del contenido. Se usa el cliente
+        # de la vista: el boton que pidio el cambio pudo haberse redibujado (y su contexto ya no existe)
+        vista.client.run_javascript(
             f"const v = document.getElementById('{vista.html_id}');"
             "if (v) { v.classList.remove('entrar'); void v.offsetWidth; v.classList.add('entrar'); }"
             "document.querySelector('.contenido')?.scrollTo({top: 0, behavior: 'smooth'});"
